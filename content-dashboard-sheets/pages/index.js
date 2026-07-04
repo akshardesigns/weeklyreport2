@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 
-const PILARS = ['Ads', 'Carousel', 'Video', 'Lainnya'];
+const PILARS = ['Ads', 'Feed', 'Carousel', 'Video', 'Lainnya'];
 const PLATFORMS = ['Instagram', 'Tiktok', 'Non sosmed'];
 const STATUSES = ['', 'On Going', 'Waiting Approval', 'Selesai Terupload'];
 
@@ -233,7 +233,7 @@ export default function Home() {
   ];
   const maxStatus = Math.max(1, ...statuses.map((s) => countStatus(s.name)));
 
-  const pilarColors = { Ads: '#0071e3', Carousel: '#64d2ff', Video: '#ff9500', Lainnya: '#8e8e93' };
+  const pilarColors = { Ads: '#0071e3', Feed: '#af52de' , Carousel: '#64d2ff', Video: '#ff9500', Lainnya: '#8e8e93' };
   const pilarCounts = PILARS.map((name) => ({
     name,
     color: pilarColors[name],
