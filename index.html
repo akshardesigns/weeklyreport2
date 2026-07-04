@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Production</title>
+<style>
+  :root{
+    --bg:#f5f5f7;
+    --card:#ffffff;
+    --ink:#1d1d1f;
+    --sub:#86868b;
+    --blue:#0071e3;
+    --blue-dark:#0059b3;
+    --green:#34c759;
+    --orange:#ff9500;
+    --red:#ff3b30;
+    --grey:#8e8e93;
+    --hair:#e8e8ed;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:56px 24px 80px;}
+  header h1{font-size:40px;font-weight:700;letter-spacing:-0.02em;margin:0 0 8px;}
+  header p{font-size:15px;color:var(--sub);margin:0 0 36px;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:40px;}
+  .kpi{background:var(--card);border-radius:18px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,0.04),0 8px 24px rgba(0,0,0,0.03);transition:transform .2s ease;}
+  .kpi:hover{transform:translateY(-2px);}
+  .kpi .label{font-size:13px;color:var(--sub);margin-bottom:10px;}
+  .kpi .value{font-size:36px;font-weight:700;letter-spacing:-0.02em;}
+
+  .panels{display:grid;grid-template-columns:1.1fr 1fr 0.9fr;gap:16px;margin-bottom:40px;}
+  .panel{background:var(--card);border-radius:18px;padding:24px;box-shadow:0 1px 2px rgba(0,0,0,0.04),0 8px 24px rgba(0,0,0,0.03);}
+  .panel h3{font-size:16px;font-weight:600;margin:0 0 16px;}
+
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:13px;}
+  .bar-row .name{width:120px;color:var(--sub);flex-shrink:0;}
+  .bar-track{flex:1;height:10px;background:var(--hair);border-radius:6px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:6px;}
+  .bar-row .num{width:24px;text-align:right;font-weight:600;}
+
+  .donut-wrap{display:flex;align-items:center;gap:22px;}
+  .donut{width:132px;height:132px;border-radius:50%;flex-shrink:0;}
+  .legend{font-size:13px;}
+  .legend div{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+  .form-panel{background:var(--card);border-radius:18px;padding:28px;margin-bottom:40px;box-shadow:0 1px 2px rgba(0,0,0,0.04),0 8px 24px rgba(0,0,0,0.03);}
+  .form-panel h3{font-size:18px;font-weight:600;margin:0 0 20px;}
+  .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field.span2{grid-column:span 2;}
+  .field.span3{grid-column:span 3;}
+  .field label{font-size:12.5px;color:var(--sub);font-weight:600;}
+  .field input,.field select{
+    border:1px solid var(--hair);
+    background:#fbfbfd;
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:14px;
+    font-family:inherit;
+    color:var(--ink);
+    outline:none;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .field input:focus,.field select:focus{
+    border-color:var(--blue);
+    box-shadow:0 0 0 3px rgba(0,113,227,0.15);
+  }
+  .form-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:20px;}
+  .btn{
+    border:none;border-radius:980px;padding:11px 22px;font-size:14px;font-weight:600;
+    cursor:pointer;transition:background .15s ease, opacity .15s ease;font-family:inherit;
+  }
+  .btn-primary{background:var(--blue);color:#fff;}
+  .btn-primary:hover{background:var(--blue-dark);}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-ghost{background:transparent;color:var(--sub);}
+  .btn-ghost:hover{color:var(--ink);}
+  .msg{font-size:13px;color:var(--red);margin-top:10px;min-height:16px;}
+
+  .list-panel{background:var(--card);border-radius:18px;padding:8px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04),0 8px 24px rgba(0,0,0,0.03);}
+  .list-panel h3{font-size:18px;font-weight:600;margin:0;padding:20px 24px 12px;}
+  table{width:100%;border-collapse:collapse;}
+  thead th{
+    text-align:left;font-size:11.5px;color:var(--sub);font-weight:600;
+    text-transform:uppercase;letter-spacing:.03em;
+    padding:10px 24px;border-bottom:1px solid var(--hair);
+  }
+  tbody td{padding:13px 24px;font-size:13.5px;border-bottom:1px solid var(--hair);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#fafafc;}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:980px;font-size:12px;font-weight:600;}
+  .pill-green{background:rgba(52,199,89,0.12);color:#1a8a3d;}
+  .pill-orange{background:rgba(255,149,0,0.12);color:#b26800;}
+  .pill-red{background:rgba(255,59,48,0.12);color:#c8291f;}
+  .pill-grey{background:rgba(142,142,147,0.12);color:#6a6a6f;}
+  .kpi-ok{color:#1a8a3d;font-weight:600;}
+  .kpi-late{color:#c8291f;font-weight:600;}
+  .kpi-none{color:var(--sub);}
+  .del-btn{background:none;border:none;color:var(--sub);cursor:pointer;font-size:16px;line-height:1;padding:4px;border-radius:6px;}
+  .del-btn:hover{color:var(--red);background:rgba(255,59,48,0.08);}
+  .empty{padding:40px 24px;text-align:center;color:var(--sub);font-size:14px;}
+
+  @media (max-width:900px){
+    .kpi-grid{grid-template-columns:repeat(2,1fr);}
+    .panels{grid-template-columns:1fr;}
+    .form-grid{grid-template-columns:1fr;}
+    .field.span2,.field.span3{grid-column:span 1;}
+    table{display:block;overflow-x:auto;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Content Production</h1>
+    <p>Target: Ads &amp; Carousel maks. 2 hari · Video &amp; Lainnya maks. 3 hari</p>
+  </header>
+
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <div class="panels">
+    <div class="panel">
+      <h3>Status Brief</h3>
+      <div id="statusBars"></div>
+    </div>
+    <div class="panel">
+      <h3>Distribusi Pilar</h3>
+      <div class="donut-wrap">
+        <div class="donut" id="pilarDonut"></div>
+        <div class="legend" id="pilarLegend"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Ketepatan Waktu</h3>
+      <div id="kpiBars"></div>
+    </div>
+  </div>
+
+  <div class="form-panel">
+    <h3>Tambah Brief</h3>
+    <form id="briefForm">
+      <div class="form-grid">
+        <div class="field">
+          <label for="tglMasuk">Tanggal Masuk</label>
+          <input type="date" id="tglMasuk" required>
+        </div>
+        <div class="field">
+          <label for="pilar">Pilar</label>
+          <select id="pilar" required>
+            <option value="Ads">Ads</option>
+            <option value="Carousel">Carousel</option>
+            <option value="Video">Video</option>
+            <option value="Lainnya">Lainnya</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="platform">Platform</label>
+          <select id="platform" required>
+            <option value="Instagram">Instagram</option>
+            <option value="Tiktok">Tiktok</option>
+            <option value="Non sosmed">Non sosmed</option>
+          </select>
+        </div>
+        <div class="field span3">
+          <label for="briefText">Brief</label>
+          <input type="text" id="briefText" placeholder="Nama / deskripsi brief" required>
+        </div>
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="">Belum Dikerjakan</option>
+            <option value="On Going">On Going</option>
+            <option value="Waiting Approval">Waiting Approval</option>
+            <option value="Selesai Terupload">Selesai Terupload</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tglSelesai">Tanggal Selesai</label>
+          <input type="date" id="tglSelesai">
+        </div>
+      </div>
+      <div class="msg" id="formMsg"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" id="resetBtn">Bersihkan</button>
+        <button type="submit" class="btn btn-primary">Tambah Brief</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="list-panel">
+    <h3>Daftar Brief</h3>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Tanggal Masuk</th><th>Pilar</th><th>Platform</th><th>Brief</th>
+          <th>Status</th><th>Tanggal Selesai</th><th>KPI</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="briefBody"></tbody>
+    </table>
+    </div>
+    <div class="empty" id="emptyState" style="display:none;">Belum ada brief. Tambahkan brief pertama di form atas.</div>
+  </div>
+</div>
+
+<script>
+const SEED = [
+  {id:'s1',tglMasuk:'2026-07-01',pilar:'Ads',platform:'Instagram',brief:'STC1 CHINA "VISA CHINA ANTI RIBET"',status:'Selesai Terupload',tglSelesai:'2026-07-01'},
+  {id:'s2',tglMasuk:'2026-07-01',pilar:'Ads',platform:'Instagram',brief:'STC2 CHINA "LIBURAN SERU BRG ORG TERSAYANG"',status:'Selesai Terupload',tglSelesai:'2026-07-01'},
+  {id:'s3',tglMasuk:'2026-07-01',pilar:'Ads',platform:'Instagram',brief:'UKV 1 "PROFIL DOKUMENMU TERLIHAT AMAN"',status:'Selesai Terupload',tglSelesai:'2026-07-01'},
+  {id:'s4',tglMasuk:'2026-07-01',pilar:'Ads',platform:'Instagram',brief:'UKV 2 "800++"',status:'Selesai Terupload',tglSelesai:'2026-07-01'},
+  {id:'s5',tglMasuk:'2026-07-01',pilar:'Ads',platform:'Instagram',brief:'STC1 KOREA "VISA KOREA NO DRAMA"',status:'Selesai Terupload',tglSelesai:'2026-07-01'},
+  {id:'s6',tglMasuk:'2026-07-01',pilar:'Ads',platform:'Instagram',brief:'STC2 KOREA "URUS BARENG BERANGKAT BARENG"',status:'Selesai Terupload',tglSelesai:'2026-07-01'},
+  {id:'s7',tglMasuk:'2026-07-02',pilar:'Carousel',platform:'Instagram',brief:'WILL YOU .... TRAVELING',status:'Waiting Approval',tglSelesai:''},
+  {id:'s8',tglMasuk:'2026-07-02',pilar:'Video',platform:'Tiktok',brief:'WHICH ONE BETTER',status:'Selesai Terupload',tglSelesai:'2026-07-03'},
+  {id:'s9',tglMasuk:'2026-07-02',pilar:'Video',platform:'Tiktok',brief:'HEAD TALK OPINI SALDO',status:'On Going',tglSelesai:''},
+  {id:'s10',tglMasuk:'2026-07-02',pilar:'Lainnya',platform:'Non sosmed',brief:'Stamp sovenir',status:'On Going',tglSelesai:''},
+  {id:'s11',tglMasuk:'2026-07-03',pilar:'Lainnya',platform:'Non sosmed',brief:'Assesment Visa UKV',status:'',tglSelesai:''},
+];
+
+const STORE_KEY = 'briefs';
+let briefs = [];
+
+async function loadBriefs(){
+  try{
+    const res = await window.storage.get(STORE_KEY, false);
+    briefs = res && res.value ? JSON.parse(res.value) : SEED.slice();
+  }catch(e){
+    briefs = SEED.slice();
+  }
+  render();
+}
+async function saveBriefs(){
+  try{ await window.storage.set(STORE_KEY, JSON.stringify(briefs), false); }
+  catch(e){ console.error('Storage error', e); }
+}
+
+function fmtDate(d){
+  if(!d) return '-';
+  const dt = new Date(d+'T00:00:00');
+  if(isNaN(dt)) return '-';
+  return dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+}
+function maxDays(pilar){ return (pilar==='Ads'||pilar==='Carousel') ? 2 : 3; }
+function kpiFor(b){
+  if(!b.tglSelesai) return null;
+  const start = new Date(b.tglMasuk+'T00:00:00');
+  const end = new Date(b.tglSelesai+'T00:00:00');
+  const diffDays = Math.round((end-start)/86400000);
+  return diffDays <= maxDays(b.pilar) ? 'On Time' : 'Late';
+}
+function statusOf(b){ return b.status ? b.status : 'Belum Dikerjakan'; }
+
+function pill(status){
+  const map = {
+    'Selesai Terupload':'pill-green',
+    'On Going':'pill-orange',
+    'Waiting Approval':'pill-red',
+    'Belum Dikerjakan':'pill-grey'
+  };
+  return `<span class="pill ${map[status]}">${status}</span>`;
+}
+
+function render(){
+  const total = briefs.length;
+  const countStatus = s => briefs.filter(b=>statusOf(b)===s).length;
+  const statuses = [
+    {name:'Selesai Terupload', color:'var(--green)'},
+    {name:'On Going', color:'var(--orange)'},
+    {name:'Waiting Approval', color:'var(--red)'},
+    {name:'Belum Dikerjakan', color:'var(--grey)'},
+  ];
+  const kpiCards = [
+    {label:'Total Brief', value: total, color:'var(--ink)'},
+    ...statuses.map(s=>({label:s.name, value: countStatus(s.name), color: s.color}))
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpiCards.map(c=>`
+    <div class="kpi"><div class="label">${c.label}</div><div class="value" style="color:${c.color}">${c.value}</div></div>
+  `).join('');
+
+  const maxStatus = Math.max(1, ...statuses.map(s=>countStatus(s.name)));
+  document.getElementById('statusBars').innerHTML = statuses.map(s=>{
+    const n = countStatus(s.name);
+    const pct = (n/maxStatus*100).toFixed(0);
+    return `<div class="bar-row"><div class="name">${s.name}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${s.color}"></div></div><div class="num">${n}</div></div>`;
+  }).join('');
+
+  const pilars = [
+    {name:'Ads', color:'#0071e3'},
+    {name:'Carousel', color:'#64d2ff'},
+    {name:'Video', color:'#ff9500'},
+    {name:'Lainnya', color:'#8e8e93'},
+  ];
+  const pilarCounts = pilars.map(p=>({...p, n: briefs.filter(b=>b.pilar===p.name).length}));
+  const totalPilar = Math.max(1, pilarCounts.reduce((a,c)=>a+c.n,0));
+  let acc = 0;
+  const stops = pilarCounts.map(p=>{
+    const start = acc/totalPilar*360;
+    acc += p.n;
+    const end = acc/totalPilar*360;
+    return `${p.color} ${start}deg ${end}deg`;
+  }).join(', ');
+  document.getElementById('pilarDonut').style.background =
+    totalPilar>0 ? `radial-gradient(circle at center, #fff 42%, transparent 43%), conic-gradient(${stops})` : 'var(--hair)';
+  document.getElementById('pilarLegend').innerHTML = pilarCounts.map(p=>
+    `<div><span class="dot" style="background:${p.color}"></span>${p.name} — ${p.n}</div>`
+  ).join('');
+
+  const kpiVals = {
+    'On Time': briefs.filter(b=>kpiFor(b)==='On Time').length,
+    'Late': briefs.filter(b=>kpiFor(b)==='Late').length,
+    'Belum Selesai': briefs.filter(b=>kpiFor(b)===null).length,
+  };
+  const kpiColors = {'On Time':'var(--green)','Late':'var(--red)','Belum Selesai':'var(--grey)'};
+  const maxKpi = Math.max(1, ...Object.values(kpiVals));
+  document.getElementById('kpiBars').innerHTML = Object.entries(kpiVals).map(([k,v])=>{
+    const pct = (v/maxKpi*100).toFixed(0);
+    return `<div class="bar-row"><div class="name">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${kpiColors[k]}"></div></div><div class="num">${v}</div></div>`;
+  }).join('');
+
+  const sorted = briefs.slice().sort((a,b)=> new Date(b.tglMasuk) - new Date(a.tglMasuk));
+  const body = document.getElementById('briefBody');
+  const empty = document.getElementById('emptyState');
+  if(sorted.length===0){
+    body.innerHTML=''; empty.style.display='block';
+  }else{
+    empty.style.display='none';
+    body.innerHTML = sorted.map(b=>{
+      const k = kpiFor(b);
+      const kpiHtml = k==='On Time' ? '<span class="kpi-ok">✓ On Time</span>' : k==='Late' ? '<span class="kpi-late">✕ Late</span>' : '<span class="kpi-none">Belum</span>';
+      return `<tr>
+        <td>${fmtDate(b.tglMasuk)}</td>
+        <td>${b.pilar}</td>
+        <td>${b.platform}</td>
+        <td>${b.brief}</td>
+        <td>${pill(statusOf(b))}</td>
+        <td>${fmtDate(b.tglSelesai)}</td>
+        <td>${kpiHtml}</td>
+        <td><button class="del-btn" title="Hapus" data-id="${b.id}">✕</button></td>
+      </tr>`;
+    }).join('');
+    body.querySelectorAll('.del-btn').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        briefs = briefs.filter(b=>b.id !== btn.dataset.id);
+        await saveBriefs();
+        render();
+      });
+    });
+  }
+}
+
+document.getElementById('briefForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const msg = document.getElementById('formMsg');
+  const tglMasuk = document.getElementById('tglMasuk').value;
+  const pilar = document.getElementById('pilar').value;
+  const platform = document.getElementById('platform').value;
+  const briefText = document.getElementById('briefText').value.trim();
+  const status = document.getElementById('status').value;
+  const tglSelesai = document.getElementById('tglSelesai').value;
+
+  if(!tglMasuk || !briefText){
+    msg.textContent = 'Tanggal masuk dan nama brief wajib diisi.';
+    return;
+  }
+  if(tglSelesai && tglSelesai < tglMasuk){
+    msg.textContent = 'Tanggal selesai tidak boleh sebelum tanggal masuk.';
+    return;
+  }
+  msg.textContent = '';
+  briefs.push({
+    id: 'b'+Date.now(),
+    tglMasuk, pilar, platform, brief: briefText, status, tglSelesai
+  });
+  await saveBriefs();
+  render();
+  e.target.reset();
+  document.getElementById('pilar').value = 'Ads';
+  document.getElementById('platform').value = 'Instagram';
+});
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  document.getElementById('briefForm').reset();
+  document.getElementById('formMsg').textContent = '';
+});
+
+loadBriefs();
+</script>
+</body>
+</html>
