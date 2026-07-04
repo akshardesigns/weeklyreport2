@@ -237,7 +237,7 @@ export default function Home() {
   const pilarCounts = PILARS.map((name) => ({
     name,
     color: pilarColors[name],
-    n: filteredBriefs.filter((b) => b.pilar === name).length,
+    n: filteredBriefs.filter((b) => b.pilar === name && statusOf(b) === 'Selesai Terupload').length,
   }));
   const totalPilar = Math.max(1, pilarCounts.reduce((a, c) => a + c.n, 0));
   let acc = 0;
@@ -320,7 +320,7 @@ export default function Home() {
               </div>
             </div>
             <div className="panel">
-              <h3>Distribusi Pilar</h3>
+              <h3>Distribusi Pilar (selesai)</h3>
               <div className="donut-wrap">
                 <div className="donut" style={{ background: donutBg }} />
                 <div className="legend">
