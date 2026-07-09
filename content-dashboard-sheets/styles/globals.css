@@ -145,6 +145,62 @@ tbody tr.is-editing{background:rgba(0,113,227,0.06);}
 .week-toggle:hover{background:rgba(0,113,227,0.18);}
 .week-toggle.is-off{color:var(--sub);background:var(--hair);}
 
+.kpi.clickable{cursor:pointer;}
+.kpi.clickable:hover{box-shadow:0 1px 2px rgba(0,0,0,0.04),0 10px 28px rgba(0,113,227,0.14);}
+
+/* --- Filter tabel Daftar Brief --- */
+.table-filters{display:flex;gap:8px;flex-wrap:wrap;padding:0 24px 16px;}
+.table-filters select{
+  border:1px solid var(--hair);background:#fbfbfd;border-radius:10px;
+  padding:8px 12px;font-size:13px;font-family:inherit;color:var(--ink);outline:none;
+  cursor:pointer;
+}
+.table-filters select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,0.15);}
+
+/* --- Panel "Brief Selesai per Hari" --- */
+.daily-panel{margin-bottom:24px;}
+.day-row{border-bottom:1px solid var(--hair);}
+.day-row:last-child{border-bottom:none;}
+.day-row-head{display:flex;align-items:center;gap:12px;padding:12px 24px;cursor:pointer;}
+.day-row-head:hover{background:#fafafc;}
+.day-row-head .chevron{display:inline-block;transition:transform .15s ease;color:var(--sub);font-size:11px;}
+.day-row-head.open .chevron{transform:rotate(90deg);}
+.day-row-date{width:150px;flex-shrink:0;font-size:13.5px;font-weight:600;}
+.day-row-track{flex:1;height:8px;background:var(--hair);border-radius:5px;overflow:hidden;}
+.day-row-fill{height:100%;background:var(--green);border-radius:5px;}
+.day-row-count{width:28px;text-align:right;font-weight:700;font-size:13.5px;}
+.day-row-list{padding:0 24px 16px 174px;display:flex;flex-direction:column;gap:6px;}
+.day-row-item{font-size:13px;color:var(--sub);display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.day-row-item b{color:var(--ink);font-weight:600;}
+.day-row-item .tag{font-size:11px;padding:2px 8px;border-radius:980px;background:var(--hair);color:var(--sub);flex-shrink:0;}
+
+/* --- Floating action button --- */
+.fab{
+  position:fixed;right:28px;bottom:28px;z-index:40;
+  width:56px;height:56px;border-radius:50%;
+  background:var(--blue);color:#fff;border:none;
+  font-size:28px;line-height:1;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 20px rgba(0,113,227,0.35),0 2px 6px rgba(0,0,0,0.15);
+  cursor:pointer;transition:transform .15s ease, background .15s ease;
+}
+.fab:hover{background:var(--blue-dark);transform:translateY(-2px) scale(1.03);}
+
+/* --- Modal Tambah/Edit Brief --- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.45);
+  display:flex;align-items:center;justify-content:center;
+  z-index:50;padding:24px;
+}
+.modal-card{
+  background:var(--card);border-radius:20px;padding:28px;
+  width:100%;max-width:640px;max-height:88vh;overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-card .form-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.modal-card h3{font-size:18px;font-weight:600;margin:0;}
+.modal-close{background:none;border:none;font-size:18px;color:var(--sub);cursor:pointer;padding:4px 10px;border-radius:8px;line-height:1;}
+.modal-close:hover{color:var(--ink);background:rgba(0,0,0,0.05);}
+
 @media (max-width:900px){
   .kpi-grid{grid-template-columns:repeat(2,1fr);}
   .panels{grid-template-columns:1fr;}
@@ -153,4 +209,8 @@ tbody tr.is-editing{background:rgba(0,113,227,0.06);}
   table{display:block;overflow-x:auto;}
   header{flex-direction:column;}
   .list-panel .list-head{flex-direction:column;align-items:flex-start;}
+  .day-row-date{width:96px;font-size:12.5px;}
+  .day-row-list{padding-left:24px;}
+  .fab{right:18px;bottom:18px;width:52px;height:52px;font-size:26px;}
+  .modal-card{padding:20px;}
 }
