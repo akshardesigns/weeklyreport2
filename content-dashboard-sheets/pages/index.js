@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 
-const PILARS = ['Ads', 'Feed', 'Carousel', 'Video', 'Lainnya'];
+const PILARS = ['Ads', 'Feed', 'Story', 'Carousel', 'Video', 'Lainnya'];
 const PLATFORMS = ['Instagram', 'Tiktok', 'Non sosmed'];
-const STATUSES = ['', 'On Going', 'Waiting Approval', 'Selesai Terupload'];
+const STATUS_OPTIONS = ['On Going', 'Waiting Approval', 'Selesai Terupload'];
 
 const EMPTY_FORM = {
   tglMasuk: '',
@@ -19,6 +19,12 @@ function fmtDate(d) {
   const dt = new Date(d + 'T00:00:00');
   if (isNaN(dt)) return '-';
   return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function fmtDateShort(d) {
+  if (!d) return '-';
+  const dt = new Date(d + 'T00:00:00');
+  if (isNaN(dt)) return '-';
+  return dt.toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short' });
 }
 function maxDays(pilar) {
   return pilar === 'Ads' || pilar === 'Carousel' ? 2 : 3;
@@ -88,9 +94,18 @@ export default function Home() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [formMsg, setFormMsg] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
 
   // null = tampilkan semua data. Selain itu: Date (Senin) minggu yang dipilih.
   const [weekFilter, setWeekFilter] = useState(null);
+
+  // filter khusus tabel "Daftar Brief"
+  const [filterPilar, setFilterPilar] = useState('');
+  const [filterPlatform, setFilterPlatform] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+
+  // tanggal yang sedang di-expand di panel "Brief Selesai per Hari"
+  const [expandedDate, setExpandedDate] = useState(null);
 
   async function loadBriefs() {
     setLoading(true);
@@ -119,6 +134,44 @@ export default function Home() {
     return briefs.filter((b) => isInWeek(b.tglMasuk, weekFilter));
   }, [briefs, weekFilter]);
 
+  // brief selesai, dikelompokkan per tanggal selesai (turun dari yang paling baru)
+  const dailyCompleted = useMemo(() => {
+    const map = {};
+    filteredBriefs.forEach((b) => {
+      if (statusOf(b) === 'Selesai Terupload' && b.tglSelesai) {
+        if (!map[b.tglSelesai]) map[b.tglSelesai] = [];
+        map[b.tglSelesai].push(b);
+      }
+    });
+    return Object.entries(map)
+      .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+      .map(([date, items]) => ({ date, items }));
+  }, [filteredBriefs]);
+  const maxDaily = Math.max(1, ...dailyCompleted.map((d) => d.items.length));
+
+  // daftar brief di tabel: filteredBriefs + filter tambahan (pilar/platform/status)
+  const tableBriefs = useMemo(() => {
+    return filteredBriefs.filter((b) => {
+      if (filterPilar && b.pilar !== filterPilar) return false;
+      if (filterPlatform && b.platform !== filterPlatform) return false;
+      if (filterStatus) {
+        if (filterStatus === 'Belum Dikerjakan') {
+          if (statusOf(b) !== 'Belum Dikerjakan') return false;
+        } else if (b.status !== filterStatus) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [filteredBriefs, filterPilar, filterPlatform, filterStatus]);
+  const hasTableFilter = filterPilar || filterPlatform || filterStatus;
+
+  function openAddForm() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setFormMsg('');
+    setFormOpen(true);
+  }
   function enterEditMode(id) {
     const b = briefs.find((x) => x.id === id);
     if (!b) return;
@@ -132,8 +185,10 @@ export default function Home() {
       tglSelesai: b.tglSelesai || '',
     });
     setFormMsg('');
+    setFormOpen(true);
   }
-  function exitEditMode() {
+  function closeForm() {
+    setFormOpen(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
     setFormMsg('');
@@ -162,7 +217,6 @@ export default function Home() {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || 'Gagal menyimpan perubahan');
         }
-        exitEditMode();
       } else {
         const res = await fetch('/api/briefs', {
           method: 'POST',
@@ -173,8 +227,8 @@ export default function Home() {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || 'Gagal menambah brief');
         }
-        setForm(EMPTY_FORM);
       }
+      closeForm();
       await loadBriefs();
     } catch (err) {
       setFormMsg(err.message);
@@ -191,7 +245,7 @@ export default function Home() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Gagal menghapus brief');
       }
-      if (editingId === id) exitEditMode();
+      if (editingId === id) closeForm();
       await loadBriefs();
     } catch (err) {
       alert(err.message);
@@ -199,7 +253,7 @@ export default function Home() {
   }
 
   function exportToExcel() {
-    const rows = filteredBriefs
+    const rows = tableBriefs
       .slice()
       .sort((a, b) => new Date(a.tglMasuk) - new Date(b.tglMasuk))
       .map((b) => ({
@@ -233,7 +287,14 @@ export default function Home() {
   ];
   const maxStatus = Math.max(1, ...statuses.map((s) => countStatus(s.name)));
 
-  const pilarColors = { Ads: '#0071e3', Feed: '#af52de' , Carousel: '#64d2ff', Video: '#ff9500', Lainnya: '#8e8e93' };
+  const pilarColors = {
+    Ads: '#0071e3',
+    Feed: '#af52de',
+    Story: '#ff375f',
+    Carousel: '#64d2ff',
+    Video: '#ff9500',
+    Lainnya: '#8e8e93',
+  };
   const pilarCounts = PILARS.map((name) => ({
     name,
     color: pilarColors[name],
@@ -262,7 +323,7 @@ export default function Home() {
   const kpiColors = { 'On Time': 'var(--green)', Late: 'var(--red)', 'Belum Selesai': 'var(--grey)' };
   const maxKpi = Math.max(1, ...Object.values(kpiVals));
 
-  const sortedBriefs = filteredBriefs.slice().sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk));
+  const sortedBriefs = tableBriefs.slice().sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk));
 
   return (
     <div className="wrap">
@@ -292,12 +353,24 @@ export default function Home() {
       ) : (
         <>
           <div className="kpi-grid">
-            {kpiCards.map((c) => (
-              <div className="kpi" key={c.label}>
-                <div className="label">{c.label}</div>
-                <div className="value" style={{ color: c.color }}>{c.value}</div>
-              </div>
-            ))}
+            {kpiCards.map((c) => {
+              const clickable = c.label === 'Selesai Terupload';
+              return (
+                <div
+                  className={`kpi${clickable ? ' clickable' : ''}`}
+                  key={c.label}
+                  onClick={
+                    clickable
+                      ? () => document.getElementById('daily-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      : undefined
+                  }
+                  title={clickable ? 'Lihat rincian per hari' : undefined}
+                >
+                  <div className="label">{c.label}</div>
+                  <div className="value" style={{ color: c.color }}>{c.value}</div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="panels">
@@ -320,7 +393,7 @@ export default function Home() {
               </div>
             </div>
             <div className="panel">
-              <h3>Distribusi Pilar (selesai)</h3>
+              <h3>Distribusi Pilar (Selesai)</h3>
               <div className="donut-wrap">
                 <div className="donut" style={{ background: donutBg }} />
                 <div className="legend">
@@ -352,92 +425,48 @@ export default function Home() {
             </div>
           </div>
 
-          <div className={`form-panel${editingId ? ' editing' : ''}`}>
-            <div className="form-head">
-              <h3>{editingId ? 'Edit Brief' : 'Tambah Brief'}</h3>
-              <span className="edit-badge">Mode Edit</span>
+          <div className="list-panel daily-panel" id="daily-panel">
+            <div className="list-head">
+              <h3>Brief Selesai per Hari</h3>
+              <span style={{ fontSize: 12.5, color: 'var(--sub)' }}>
+                {dailyCompleted.reduce((a, d) => a + d.items.length, 0)} brief selesai
+                {weekFilter ? ' pada minggu ini' : ''}
+              </span>
             </div>
-            <form onSubmit={handleSubmit}>
-              <div className="form-grid">
-                <div className="field">
-                  <label htmlFor="tglMasuk">Tanggal Masuk</label>
-                  <input
-                    type="date"
-                    id="tglMasuk"
-                    required
-                    value={form.tglMasuk}
-                    onChange={(e) => setForm({ ...form, tglMasuk: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="pilar">Pilar</label>
-                  <select id="pilar" value={form.pilar} onChange={(e) => setForm({ ...form, pilar: e.target.value })}>
-                    {PILARS.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="platform">Platform</label>
-                  <select id="platform" value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })}>
-                    {PLATFORMS.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field span3">
-                  <label htmlFor="briefText">Brief</label>
-                  <input
-                    type="text"
-                    id="briefText"
-                    placeholder="Nama / deskripsi brief"
-                    required
-                    value={form.brief}
-                    onChange={(e) => setForm({ ...form, brief: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="status">Status</label>
-                  <select id="status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                    <option value="">Belum Dikerjakan</option>
-                    <option value="On Going">On Going</option>
-                    <option value="Waiting Approval">Waiting Approval</option>
-                    <option value="Selesai Terupload">Selesai Terupload</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="tglSelesai">Tanggal Selesai</label>
-                  <input
-                    type="date"
-                    id="tglSelesai"
-                    value={form.tglSelesai}
-                    onChange={(e) => setForm({ ...form, tglSelesai: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="msg">{formMsg}</div>
-              <div className="form-actions">
-                {editingId && (
-                  <button type="button" className="btn btn-ghost" onClick={exitEditMode}>Batal Edit</button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    if (editingId) exitEditMode();
-                    else {
-                      setForm(EMPTY_FORM);
-                      setFormMsg('');
-                    }
-                  }}
-                >
-                  Bersihkan
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Menyimpan…' : editingId ? 'Simpan Perubahan' : 'Tambah Brief'}
-                </button>
-              </div>
-            </form>
+            {dailyCompleted.length === 0 ? (
+              <div className="empty">Belum ada brief yang selesai.</div>
+            ) : (
+              dailyCompleted.map((d) => {
+                const isOpen = expandedDate === d.date;
+                const pct = ((d.items.length / maxDaily) * 100).toFixed(0);
+                return (
+                  <div className="day-row" key={d.date}>
+                    <div
+                      className={`day-row-head${isOpen ? ' open' : ''}`}
+                      onClick={() => setExpandedDate(isOpen ? null : d.date)}
+                    >
+                      <span className="chevron">▸</span>
+                      <div className="day-row-date">{fmtDateShort(d.date)}</div>
+                      <div className="day-row-track">
+                        <div className="day-row-fill" style={{ width: pct + '%' }} />
+                      </div>
+                      <div className="day-row-count">{d.items.length}</div>
+                    </div>
+                    {isOpen && (
+                      <div className="day-row-list">
+                        {d.items.map((b) => (
+                          <div className="day-row-item" key={b.id}>
+                            <b>{b.brief}</b>
+                            <span className="tag">{b.pilar}</span>
+                            <span className="tag">{b.platform}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
 
           <div className="list-panel">
@@ -464,6 +493,41 @@ export default function Home() {
                 )}
               </div>
             </div>
+
+            <div className="table-filters">
+              <select value={filterPilar} onChange={(e) => setFilterPilar(e.target.value)}>
+                <option value="">Semua Pilar</option>
+                {PILARS.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+              <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
+                <option value="">Semua Platform</option>
+                {PLATFORMS.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                <option value="">Semua Status</option>
+                <option value="Belum Dikerjakan">Belum Dikerjakan</option>
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              {hasTableFilter && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setFilterPilar('');
+                    setFilterPlatform('');
+                    setFilterStatus('');
+                  }}
+                >
+                  Reset Filter
+                </button>
+              )}
+            </div>
+
             <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
@@ -508,11 +572,94 @@ export default function Home() {
             </div>
             {sortedBriefs.length === 0 && (
               <div className="empty">
-                {weekFilter ? 'Tidak ada brief pada minggu ini.' : 'Belum ada brief. Tambahkan brief pertama di form atas.'}
+                {hasTableFilter
+                  ? 'Tidak ada brief yang cocok dengan filter ini.'
+                  : weekFilter
+                  ? 'Tidak ada brief pada minggu ini.'
+                  : 'Belum ada brief. Klik tombol + di kanan bawah untuk menambahkan.'}
               </div>
             )}
           </div>
         </>
+      )}
+
+      <button className="fab" onClick={openAddForm} title="Tambah Brief">+</button>
+
+      {formOpen && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && closeForm()}>
+          <div className="modal-card">
+            <div className="form-head">
+              <h3>{editingId ? 'Edit Brief' : 'Tambah Brief'}</h3>
+              <button className="modal-close" onClick={closeForm} title="Tutup">✕</button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="form-grid">
+                <div className="field">
+                  <label htmlFor="tglMasuk">Tanggal Masuk</label>
+                  <input
+                    type="date"
+                    id="tglMasuk"
+                    required
+                    value={form.tglMasuk}
+                    onChange={(e) => setForm({ ...form, tglMasuk: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="pilar">Pilar</label>
+                  <select id="pilar" value={form.pilar} onChange={(e) => setForm({ ...form, pilar: e.target.value })}>
+                    {PILARS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="platform">Platform</label>
+                  <select id="platform" value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })}>
+                    {PLATFORMS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field span3">
+                  <label htmlFor="briefText">Brief</label>
+                  <input
+                    type="text"
+                    id="briefText"
+                    placeholder="Nama / deskripsi brief"
+                    required
+                    value={form.brief}
+                    onChange={(e) => setForm({ ...form, brief: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="status">Status</label>
+                  <select id="status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                    <option value="">Belum Dikerjakan</option>
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="tglSelesai">Tanggal Selesai</label>
+                  <input
+                    type="date"
+                    id="tglSelesai"
+                    value={form.tglSelesai}
+                    onChange={(e) => setForm({ ...form, tglSelesai: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="msg">{formMsg}</div>
+              <div className="form-actions">
+                <button type="button" className="btn btn-ghost" onClick={closeForm}>Batal</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? 'Menyimpan…' : editingId ? 'Simpan Perubahan' : 'Tambah Brief'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
