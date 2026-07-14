@@ -12,6 +12,7 @@ const EMPTY_FORM = {
   brief: '',
   status: '',
   tglSelesai: '',
+  hasilAkhir: '',
 };
 
 function fmtDate(d) {
@@ -49,15 +50,13 @@ function pillClass(status) {
   return map[status] || 'pill-grey';
 }
 
-// --- Helper minggu (Senin - Minggu) ---
-function startOfWeek(date) {
-  const d = new Date(date);
-  const day = d.getDay(); // 0=Minggu
-  const diff = day === 0 ? -6 : 1 - day; // geser ke Senin
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+// --- Helper minggu custom ---
+// Minggu 1 (index 0) = minggu pertama kerja, range-nya tidak genap 7 hari: 29 Jun - 9 Jul.
+// Minggu 2 dst (index 1, 2, ...) = blok 7 hari berturut-turut mulai 10 Jul, mengikuti
+// jadwal weekly report tiap hari Kamis (Jumat - Kamis).
+const WEEK1_START = '2026-07-01';
+const WEEK1_END = '2026-07-09';
+
 function addDays(date, n) {
   const d = new Date(date);
   d.setDate(d.getDate() + n);
@@ -69,20 +68,45 @@ function toISO(d) {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-function formatWeekLabel(weekStart) {
-  const weekEnd = addDays(weekStart, 6);
-  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
+function parseISODate(s) {
+  return new Date(s + 'T00:00:00');
+}
+// Mengembalikan { start, end } (Date, inclusive) untuk index minggu ke-n (0-based).
+function getWeekRange(weekIndex) {
+  const week1Start = parseISODate(WEEK1_START);
+  const week1End = parseISODate(WEEK1_END);
+  if (weekIndex <= 0) {
+    return { start: week1Start, end: week1End };
+  }
+  const week2Start = addDays(week1End, 1); // 10 Jul
+  const start = addDays(week2Start, (weekIndex - 1) * 7);
+  const end = addDays(start, 6);
+  return { start, end };
+}
+function formatWeekLabel(weekIndex) {
+  const { start, end } = getWeekRange(weekIndex);
+  const sameMonth = start.getMonth() === end.getMonth();
   const optsShort = { day: '2-digit' };
   const optsFull = { day: '2-digit', month: 'short', year: 'numeric' };
-  const startLabel = weekStart.toLocaleDateString('id-ID', sameMonth ? optsShort : optsFull);
-  const endLabel = weekEnd.toLocaleDateString('id-ID', optsFull);
-  return `${startLabel} - ${endLabel}`;
+  const startLabel = start.toLocaleDateString('id-ID', sameMonth ? optsShort : optsFull);
+  const endLabel = end.toLocaleDateString('id-ID', optsFull);
+  return `Minggu ${weekIndex + 1} · ${startLabel} - ${endLabel}`;
 }
-function isInWeek(isoDateStr, weekStart) {
+function isInWeek(isoDateStr, weekIndex) {
   if (!isoDateStr) return false;
-  const d = new Date(isoDateStr + 'T00:00:00');
-  const weekEnd = addDays(weekStart, 7);
-  return d >= weekStart && d < weekEnd;
+  const d = parseISODate(isoDateStr);
+  const { start, end } = getWeekRange(weekIndex);
+  return d >= start && d <= end;
+}
+// Menentukan index minggu yang memuat tanggal hari ini.
+function currentWeekIndex() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const week1End = parseISODate(WEEK1_END);
+  if (today <= week1End) return 0;
+  const week2Start = addDays(week1End, 1);
+  const diffDays = Math.round((today - week2Start) / 86400000);
+  return 1 + Math.floor(diffDays / 7);
 }
 
 export default function Home() {
@@ -95,6 +119,8 @@ export default function Home() {
   const [editingId, setEditingId] = useState(null);
   const [formMsg, setFormMsg] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
 
   // null = tampilkan semua data. Selain itu: Date (Senin) minggu yang dipilih.
   const [weekFilter, setWeekFilter] = useState(null);
@@ -130,7 +156,7 @@ export default function Home() {
   }, []);
 
   const filteredBriefs = useMemo(() => {
-    if (!weekFilter) return briefs;
+    if (weekFilter === null) return briefs;
     return briefs.filter((b) => isInWeek(b.tglMasuk, weekFilter));
   }, [briefs, weekFilter]);
 
@@ -170,6 +196,7 @@ export default function Home() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setFormMsg('');
+    setUploadedFileName('');
     setFormOpen(true);
   }
   function enterEditMode(id) {
@@ -183,8 +210,10 @@ export default function Home() {
       brief: b.brief,
       status: b.status,
       tglSelesai: b.tglSelesai || '',
+      hasilAkhir: b.hasilAkhir || '',
     });
     setFormMsg('');
+    setUploadedFileName('');
     setFormOpen(true);
   }
   function closeForm() {
@@ -192,6 +221,49 @@ export default function Home() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setFormMsg('');
+    setUploadedFileName('');
+  }
+
+  async function handleFileUpload(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setFormMsg('Ukuran file maksimal 10MB.');
+      e.target.value = '';
+      return;
+    }
+    setUploading(true);
+    setFormMsg('');
+    try {
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = () => reject(new Error('Gagal membaca file'));
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, mimeType: file.type, base64Data }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal mengunggah file');
+      }
+      const data = await res.json();
+      setForm((f) => ({ ...f, hasilAkhir: data.url }));
+      setUploadedFileName(file.name);
+    } catch (err) {
+      setFormMsg(err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  }
+
+  function clearHasilAkhir() {
+    setForm((f) => ({ ...f, hasilAkhir: '' }));
+    setUploadedFileName('');
   }
 
   async function handleSubmit(e) {
@@ -264,9 +336,10 @@ export default function Home() {
         Status: b.status,
         'Tanggal Selesai': b.tglSelesai,
         KPI: kpiFor(b) || '',
+        'Hasil Akhir': b.hasilAkhir || '',
       }));
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 18 }, { wch: 14 }, { wch: 10 }];
+    ws['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'input');
     XLSX.writeFile(wb, 'content-briefs.xlsx');
@@ -352,6 +425,30 @@ export default function Home() {
         <div className="loading">Memuat data dari Google Sheets…</div>
       ) : (
         <>
+          <div className="week-filter-panel">
+            <div className="week-filter-panel-label">Filter Minggu Produksi</div>
+            <div className="week-filter">
+              <button
+                className={`week-toggle${weekFilter ? '' : ' is-off'}`}
+                onClick={() => setWeekFilter(weekFilter === null ? currentWeekIndex() : null)}
+              >
+                {weekFilter ? 'Filter: Mingguan' : 'Semua Minggu'}
+              </button>
+              {weekFilter !== null && (
+                <div className="week-nav">
+                  <button onClick={() => setWeekFilter(Math.max(0, weekFilter - 1))} title="Minggu sebelumnya">‹</button>
+                  <span className="week-label">{formatWeekLabel(weekFilter)}</span>
+                  <button onClick={() => setWeekFilter(weekFilter + 1)} title="Minggu berikutnya">›</button>
+                </div>
+              )}
+              {weekFilter !== null && weekFilter !== currentWeekIndex() && (
+                <button className="btn btn-ghost btn-sm" onClick={() => setWeekFilter(currentWeekIndex())}>
+                  Minggu Ini
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="kpi-grid">
             {kpiCards.map((c) => {
               const clickable = c.label === 'Selesai Terupload';
@@ -472,26 +569,6 @@ export default function Home() {
           <div className="list-panel">
             <div className="list-head">
               <h3>Daftar Brief</h3>
-              <div className="week-filter">
-                <button
-                  className={`week-toggle${weekFilter ? '' : ' is-off'}`}
-                  onClick={() => setWeekFilter(weekFilter ? null : startOfWeek(new Date()))}
-                >
-                  {weekFilter ? 'Filter: Mingguan' : 'Semua Minggu'}
-                </button>
-                {weekFilter && (
-                  <div className="week-nav">
-                    <button onClick={() => setWeekFilter(addDays(weekFilter, -7))} title="Minggu sebelumnya">‹</button>
-                    <span className="week-label">{formatWeekLabel(weekFilter)}</span>
-                    <button onClick={() => setWeekFilter(addDays(weekFilter, 7))} title="Minggu berikutnya">›</button>
-                  </div>
-                )}
-                {weekFilter && toISO(weekFilter) !== toISO(startOfWeek(new Date())) && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => setWeekFilter(startOfWeek(new Date()))}>
-                    Minggu Ini
-                  </button>
-                )}
-              </div>
             </div>
 
             <div className="table-filters">
@@ -539,6 +616,7 @@ export default function Home() {
                     <th>Status</th>
                     <th>Tanggal Selesai</th>
                     <th>KPI</th>
+                    <th>Hasil Akhir</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -557,6 +635,15 @@ export default function Home() {
                           {k === 'On Time' && <span className="kpi-ok">✓ On Time</span>}
                           {k === 'Late' && <span className="kpi-late">✕ Late</span>}
                           {k === null && <span className="kpi-none">Belum</span>}
+                        </td>
+                        <td>
+                          {b.hasilAkhir ? (
+                            <a className="result-link" href={b.hasilAkhir} target="_blank" rel="noopener noreferrer">
+                              Buka ↗
+                            </a>
+                          ) : (
+                            <span className="kpi-none">-</span>
+                          )}
                         </td>
                         <td>
                           <div className="row-actions">
@@ -648,6 +735,32 @@ export default function Home() {
                     value={form.tglSelesai}
                     onChange={(e) => setForm({ ...form, tglSelesai: e.target.value })}
                   />
+                </div>
+                <div className="field span3">
+                  <label htmlFor="hasilAkhir">Hasil Akhir (link atau file)</label>
+                  <div className="hasil-akhir-row">
+                    <input
+                      type="text"
+                      id="hasilAkhir"
+                      placeholder="Tempel link (Drive, Canva, dll)…"
+                      value={form.hasilAkhir}
+                      onChange={(e) => {
+                        setForm({ ...form, hasilAkhir: e.target.value });
+                        setUploadedFileName('');
+                      }}
+                    />
+                    <label className="btn btn-outline btn-sm upload-btn">
+                      {uploading ? 'Mengunggah…' : 'Upload File'}
+                      <input type="file" hidden onChange={handleFileUpload} disabled={uploading} />
+                    </label>
+                  </div>
+                  {form.hasilAkhir && (
+                    <div className="hasil-akhir-preview">
+                      {uploadedFileName ? `File: ${uploadedFileName} — ` : ''}
+                      <a href={form.hasilAkhir} target="_blank" rel="noopener noreferrer">{form.hasilAkhir}</a>
+                      <button type="button" className="hasil-akhir-clear" onClick={clearHasilAkhir} title="Hapus">✕</button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="msg">{formMsg}</div>
