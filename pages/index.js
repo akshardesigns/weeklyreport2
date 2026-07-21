@@ -254,9 +254,9 @@ export default function Home() {
   }, [filteredBriefs, filterPilar, filterPlatform, filterStatus]);
   const hasTableFilter = filterPilar || filterPlatform || filterStatus;
 
-  function openAddForm() {
+  function openAddForm(prefill) {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm(prefill ? { ...EMPTY_FORM, ...prefill } : EMPTY_FORM);
     setFormMsg('');
     setUploadedFileName('');
     setFormOpen(true);
@@ -579,6 +579,8 @@ export default function Home() {
                 <div
                   key={cell.iso}
                   className={`calendar-cell${cell.inMonth ? '' : ' is-outside'}${cell.iso === today ? ' is-today' : ''}`}
+                  onDoubleClick={() => openAddForm({ tglPosting: cell.iso })}
+                  title="Klik dua kali untuk tambah brief di tanggal ini"
                 >
                   <div className="calendar-cell-date">{cell.date.getDate()}</div>
                   <div className="calendar-cell-items">
@@ -589,7 +591,10 @@ export default function Home() {
                           key={b.id}
                           className="calendar-item"
                           style={{ background: style.bg, borderLeftColor: style.border }}
-                          onClick={() => enterEditMode(b.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            enterEditMode(b.id);
+                          }}
                           title={`${platformLabel(b)} · ${b.pilar} · ${b.brief} — ${statusOf(b)}`}
                         >
                           <div className="calendar-item-platform">{platformLabel(b)} · {b.pilar}</div>

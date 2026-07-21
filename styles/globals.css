@@ -208,7 +208,7 @@ tbody tr.is-editing{background:rgba(0,113,227,0.06);}
 
 .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
 .calendar-dow{font-size:12px;font-weight:600;color:var(--sub);text-align:center;padding-bottom:6px;}
-.calendar-cell{background:var(--card);border-radius:14px;min-height:110px;padding:8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:4px;}
+.calendar-cell{background:var(--card);border-radius:14px;min-height:110px;padding:8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);display:flex;flex-direction:column;gap:4px;cursor:pointer;}
 .calendar-cell.is-outside{background:transparent;box-shadow:none;opacity:.4;}
 .calendar-cell.is-today{outline:2px solid var(--blue);outline-offset:-2px;}
 .calendar-cell-date{font-size:12.5px;font-weight:700;color:var(--sub);}
