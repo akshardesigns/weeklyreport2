@@ -13,6 +13,13 @@ const EMPTY_FORM = {
   status: '',
   tglSelesai: '',
   hasilAkhir: '',
+  tglPosting: '',
+};
+
+const PLATFORM_COLORS = {
+  Instagram: '#af52de',
+  Tiktok: '#0071e3',
+  'Non sosmed': '#8e8e93',
 };
 
 function fmtDate(d) {
@@ -109,6 +116,32 @@ function currentWeekIndex() {
   return 1 + Math.floor(diffDays / 7);
 }
 
+// --- Helper kalender bulanan (Kalender Konten, berbasis tglPosting) ---
+const DAY_LABELS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+function monthLabel(d) {
+  return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+}
+// Bangun grid 6x7 (42 sel) untuk bulan dari `monthDate`, dimulai hari Minggu.
+function buildMonthGrid(monthDate) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const startOffset = firstOfMonth.getDay(); // 0 = Minggu
+  const gridStart = addDays(firstOfMonth, -startOffset);
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const date = addDays(gridStart, i);
+    cells.push({ date, iso: toISO(date), inMonth: date.getMonth() === month });
+  }
+  return cells;
+}
+function isSameISODate(a, b) {
+  return a === b;
+}
+function todayISO() {
+  return toISO(new Date());
+}
+
 export default function Home() {
   const [briefs, setBriefs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -132,6 +165,13 @@ export default function Home() {
 
   // tanggal yang sedang di-expand di panel "Brief Selesai per Hari"
   const [expandedDate, setExpandedDate] = useState(null);
+
+  // 'dashboard' = tampilan lama (produksi), 'kalender' = Kalender Konten (tglPosting)
+  const [view, setView] = useState('dashboard');
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
 
   async function loadBriefs() {
     setLoading(true);
@@ -211,6 +251,7 @@ export default function Home() {
       status: b.status,
       tglSelesai: b.tglSelesai || '',
       hasilAkhir: b.hasilAkhir || '',
+      tglPosting: b.tglPosting || '',
     });
     setFormMsg('');
     setUploadedFileName('');
@@ -398,6 +439,24 @@ export default function Home() {
 
   const sortedBriefs = tableBriefs.slice().sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk));
 
+  // ------ Kalender Konten: grouping brief berdasarkan tglPosting ------
+  const postingByDate = useMemo(() => {
+    const map = {};
+    briefs.forEach((b) => {
+      if (!b.tglPosting) return;
+      if (!map[b.tglPosting]) map[b.tglPosting] = [];
+      map[b.tglPosting].push(b);
+    });
+    return map;
+  }, [briefs]);
+  const unscheduledBriefs = useMemo(
+    () => briefs.filter((b) => !b.tglPosting).sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk)),
+    [briefs]
+  );
+  const monthGrid = useMemo(() => buildMonthGrid(calendarMonth), [calendarMonth]);
+  const [expandedCell, setExpandedCell] = useState(null);
+  const today = todayISO();
+
   return (
     <div className="wrap">
       <header>
@@ -406,8 +465,24 @@ export default function Home() {
           <p>Target: Ads &amp; Carousel maks. 2 hari · Video &amp; Lainnya maks. 3 hari</p>
         </div>
         <div className="header-actions">
+          <div className="view-switch">
+            <button
+              className={`view-switch-btn${view === 'dashboard' ? ' is-active' : ''}`}
+              onClick={() => setView('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button
+              className={`view-switch-btn${view === 'kalender' ? ' is-active' : ''}`}
+              onClick={() => setView('kalender')}
+            >
+              Kalender Konten
+            </button>
+          </div>
           <button className="btn btn-outline" onClick={loadBriefs}>Refresh</button>
-          <button className="btn btn-primary" onClick={exportToExcel}>Export ke Excel</button>
+          {view === 'dashboard' && (
+            <button className="btn btn-primary" onClick={exportToExcel}>Export ke Excel</button>
+          )}
         </div>
       </header>
       <p className="sync-note">
@@ -423,6 +498,110 @@ export default function Home() {
 
       {loading ? (
         <div className="loading">Memuat data dari Google Sheets…</div>
+      ) : view === 'kalender' ? (
+        <div className="calendar-view">
+          <div className="calendar-toolbar">
+            <div className="calendar-nav">
+              <button
+                onClick={() => setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+                title="Bulan sebelumnya"
+              >
+                ‹
+              </button>
+              <span className="calendar-month-label">{monthLabel(calendarMonth)}</span>
+              <button
+                onClick={() => setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+                title="Bulan berikutnya"
+              >
+                ›
+              </button>
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                const d = new Date();
+                setCalendarMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+              }}
+            >
+              Bulan Ini
+            </button>
+          </div>
+
+          <div className="calendar-grid">
+            {DAY_LABELS.map((d) => (
+              <div className="calendar-dow" key={d}>{d}</div>
+            ))}
+            {monthGrid.map((cell) => {
+              const items = postingByDate[cell.iso] || [];
+              const isOpen = expandedCell === cell.iso;
+              return (
+                <div
+                  key={cell.iso}
+                  className={`calendar-cell${cell.inMonth ? '' : ' is-outside'}${cell.iso === today ? ' is-today' : ''}`}
+                >
+                  <div className="calendar-cell-date">{cell.date.getDate()}</div>
+                  <div className="calendar-cell-items">
+                    {(isOpen ? items : items.slice(0, 3)).map((b) => (
+                      <div
+                        key={b.id}
+                        className="calendar-item"
+                        style={{ borderLeftColor: PLATFORM_COLORS[b.platform] || 'var(--grey)' }}
+                        onClick={() => enterEditMode(b.id)}
+                        title={`${b.brief} — ${b.platform} (${b.pilar})`}
+                      >
+                        {b.brief}
+                      </div>
+                    ))}
+                    {!isOpen && items.length > 3 && (
+                      <button className="calendar-more" onClick={() => setExpandedCell(cell.iso)}>
+                        +{items.length - 3} lagi
+                      </button>
+                    )}
+                    {isOpen && items.length > 3 && (
+                      <button className="calendar-more" onClick={() => setExpandedCell(null)}>
+                        Ciutkan
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="calendar-legend">
+            {PLATFORMS.map((p) => (
+              <div key={p}>
+                <span className="dot" style={{ background: PLATFORM_COLORS[p] }} />
+                {p}
+              </div>
+            ))}
+          </div>
+
+          <div className="list-panel" style={{ marginTop: 24 }}>
+            <div className="list-head">
+              <h3>Belum Dijadwalkan</h3>
+              <span style={{ fontSize: 12.5, color: 'var(--sub)' }}>{unscheduledBriefs.length} brief</span>
+            </div>
+            {unscheduledBriefs.length === 0 ? (
+              <div className="empty">Semua brief sudah punya tanggal posting.</div>
+            ) : (
+              <div className="unscheduled-list">
+                {unscheduledBriefs.map((b) => (
+                  <div className="unscheduled-item" key={b.id} onClick={() => enterEditMode(b.id)}>
+                    <span
+                      className="dot"
+                      style={{ background: PLATFORM_COLORS[b.platform] || 'var(--grey)' }}
+                    />
+                    <span className="unscheduled-brief">{b.brief}</span>
+                    <span className="tag">{b.pilar}</span>
+                    <span className="tag">{b.platform}</span>
+                    <span className="unscheduled-hint">Klik untuk atur tanggal posting</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
         <>
           <div className="week-filter-panel">
@@ -736,6 +915,16 @@ export default function Home() {
                     onChange={(e) => setForm({ ...form, tglSelesai: e.target.value })}
                   />
                 </div>
+                <div className="field">
+                  <label htmlFor="tglPosting">Tanggal Posting</label>
+                  <input
+                    type="date"
+                    id="tglPosting"
+                    value={form.tglPosting}
+                    onChange={(e) => setForm({ ...form, tglPosting: e.target.value })}
+                  />
+                </div>
+                <div className="field span2" />
                 <div className="field span3">
                   <label htmlFor="hasilAkhir">Hasil Akhir (link atau file)</label>
                   <div className="hasil-akhir-row">
