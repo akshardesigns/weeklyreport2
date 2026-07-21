@@ -76,7 +76,7 @@ header p{font-size:15px;color:var(--sub);margin:0;}
 .field.span2{grid-column:span 2;}
 .field.span3{grid-column:span 3;}
 .field label{font-size:12.5px;color:var(--sub);font-weight:600;}
-.field input,.field select{
+.field input,.field select,.field textarea{
   border:1px solid var(--hair);
   background:#fbfbfd;
   border-radius:10px;
@@ -86,11 +86,20 @@ header p{font-size:15px;color:var(--sub);margin:0;}
   color:var(--ink);
   outline:none;
   transition:border-color .15s ease, box-shadow .15s ease;
+  resize:vertical;
 }
-.field input:focus,.field select:focus{
+.field input:focus,.field select:focus,.field textarea:focus{
   border-color:var(--blue);
   box-shadow:0 0 0 3px rgba(0,113,227,0.15);
 }
+.checkbox-row{display:flex;flex-wrap:wrap;gap:8px;}
+.checkbox-chip{
+  display:flex;align-items:center;gap:7px;
+  border:1px solid var(--hair);background:#fbfbfd;border-radius:10px;
+  padding:9px 14px;font-size:13.5px;color:var(--ink);cursor:pointer;user-select:none;
+}
+.checkbox-chip:has(input:checked){border-color:var(--blue);background:rgba(0,113,227,0.08);color:var(--blue);font-weight:600;}
+.checkbox-chip input{margin:0;}
 .form-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:20px;}
 .msg{font-size:13px;color:var(--red);margin-top:10px;min-height:16px;}
 
@@ -205,8 +214,10 @@ tbody tr.is-editing{background:rgba(0,113,227,0.06);}
 .calendar-cell-date{font-size:12.5px;font-weight:700;color:var(--sub);}
 .calendar-cell.is-today .calendar-cell-date{color:var(--blue);}
 .calendar-cell-items{display:flex;flex-direction:column;gap:4px;overflow:hidden;}
-.calendar-item{font-size:11.5px;padding:3px 6px;border-left:3px solid var(--grey);background:var(--bg);border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.calendar-item:hover{background:var(--hair);}
+.calendar-item{font-size:11px;padding:4px 6px;border-left:3px solid var(--grey);border-radius:4px;cursor:pointer;overflow:hidden;}
+.calendar-item:hover{filter:brightness(0.97);}
+.calendar-item-platform{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.calendar-item-title{font-size:11.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .calendar-more{border:none;background:none;color:var(--blue);font-size:11px;font-weight:600;cursor:pointer;text-align:left;padding:2px 4px;}
 
 .calendar-legend{display:flex;gap:18px;margin-top:16px;font-size:13px;color:var(--sub);}

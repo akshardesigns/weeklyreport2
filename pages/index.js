@@ -8,8 +8,9 @@ const STATUS_OPTIONS = ['On Going', 'Waiting Approval', 'Selesai Terupload'];
 const EMPTY_FORM = {
   tglMasuk: '',
   pilar: 'Ads',
-  platform: 'Instagram',
+  platform: [],
   brief: '',
+  deskripsiBrief: '',
   status: '',
   tglSelesai: '',
   hasilAkhir: '',
@@ -20,6 +21,27 @@ const PLATFORM_COLORS = {
   Instagram: '#af52de',
   Tiktok: '#0071e3',
   'Non sosmed': '#8e8e93',
+};
+
+// platform disimpan di Sheets sebagai string dipisah koma ("Instagram,Tiktok")
+// supaya satu brief bisa menyasar lebih dari satu platform sekaligus.
+function platformsOf(b) {
+  return (b.platform || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+function platformLabel(b) {
+  const list = platformsOf(b);
+  return list.length ? list.join(' + ') : '-';
+}
+
+// Warna kartu di Kalender Konten mengikuti status brief.
+const CALENDAR_STATUS_STYLE = {
+  'Belum Dikerjakan': { bg: '#ffffff', border: 'var(--hair)' },
+  'On Going': { bg: '#fff9db', border: '#ffcc00' },
+  'Waiting Approval': { bg: 'rgba(255,59,48,0.10)', border: 'var(--red)' },
+  'Selesai Terupload': { bg: 'rgba(52,199,89,0.14)', border: 'var(--green)' },
 };
 
 function fmtDate(d) {
@@ -219,7 +241,7 @@ export default function Home() {
   const tableBriefs = useMemo(() => {
     return filteredBriefs.filter((b) => {
       if (filterPilar && b.pilar !== filterPilar) return false;
-      if (filterPlatform && b.platform !== filterPlatform) return false;
+      if (filterPlatform && !platformsOf(b).includes(filterPlatform)) return false;
       if (filterStatus) {
         if (filterStatus === 'Belum Dikerjakan') {
           if (statusOf(b) !== 'Belum Dikerjakan') return false;
@@ -246,8 +268,9 @@ export default function Home() {
     setForm({
       tglMasuk: b.tglMasuk,
       pilar: b.pilar,
-      platform: b.platform,
+      platform: platformsOf(b),
       brief: b.brief,
+      deskripsiBrief: b.deskripsiBrief || '',
       status: b.status,
       tglSelesai: b.tglSelesai || '',
       hasilAkhir: b.hasilAkhir || '',
@@ -310,7 +333,11 @@ export default function Home() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.tglMasuk || !form.brief.trim()) {
-      setFormMsg('Tanggal masuk dan nama brief wajib diisi.');
+      setFormMsg('Tanggal masuk dan judul brief wajib diisi.');
+      return;
+    }
+    if (!form.platform || form.platform.length === 0) {
+      setFormMsg('Pilih minimal satu platform.');
       return;
     }
     if (form.tglSelesai && form.tglSelesai < form.tglMasuk) {
@@ -319,12 +346,13 @@ export default function Home() {
     }
     setFormMsg('');
     setSaving(true);
+    const payload = { ...form, platform: form.platform.join(',') };
     try {
       if (editingId) {
         const res = await fetch(`/api/briefs/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -334,7 +362,7 @@ export default function Home() {
         const res = await fetch('/api/briefs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -372,15 +400,28 @@ export default function Home() {
       .map((b) => ({
         'Tanggal Masuk': b.tglMasuk,
         Pilar: b.pilar,
-        Platform: b.platform,
-        Brief: b.brief,
+        Platform: platformLabel(b),
+        'Judul Brief': b.brief,
+        'Deskripsi Brief': b.deskripsiBrief || '',
         Status: b.status,
         'Tanggal Selesai': b.tglSelesai,
+        'Tanggal Posting': b.tglPosting || '',
         KPI: kpiFor(b) || '',
-        'Hasil Akhir': b.hasilAkhir || '',
+        'Sumber/Referensi': b.hasilAkhir || '',
       }));
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 30 }];
+    ws['!cols'] = [
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 16 },
+      { wch: 30 },
+      { wch: 40 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 10 },
+      { wch: 30 },
+    ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'input');
     XLSX.writeFile(wb, 'content-briefs.xlsx');
@@ -541,17 +582,21 @@ export default function Home() {
                 >
                   <div className="calendar-cell-date">{cell.date.getDate()}</div>
                   <div className="calendar-cell-items">
-                    {(isOpen ? items : items.slice(0, 3)).map((b) => (
-                      <div
-                        key={b.id}
-                        className="calendar-item"
-                        style={{ borderLeftColor: PLATFORM_COLORS[b.platform] || 'var(--grey)' }}
-                        onClick={() => enterEditMode(b.id)}
-                        title={`${b.brief} — ${b.platform} (${b.pilar})`}
-                      >
-                        {b.brief}
-                      </div>
-                    ))}
+                    {(isOpen ? items : items.slice(0, 3)).map((b) => {
+                      const style = CALENDAR_STATUS_STYLE[statusOf(b)] || CALENDAR_STATUS_STYLE['Belum Dikerjakan'];
+                      return (
+                        <div
+                          key={b.id}
+                          className="calendar-item"
+                          style={{ background: style.bg, borderLeftColor: style.border }}
+                          onClick={() => enterEditMode(b.id)}
+                          title={`${platformLabel(b)} · ${b.pilar} · ${b.brief} — ${statusOf(b)}`}
+                        >
+                          <div className="calendar-item-platform">{platformLabel(b)} · {b.pilar}</div>
+                          <div className="calendar-item-title">{b.brief}</div>
+                        </div>
+                      );
+                    })}
                     {!isOpen && items.length > 3 && (
                       <button className="calendar-more" onClick={() => setExpandedCell(cell.iso)}>
                         +{items.length - 3} lagi
@@ -569,10 +614,10 @@ export default function Home() {
           </div>
 
           <div className="calendar-legend">
-            {PLATFORMS.map((p) => (
-              <div key={p}>
-                <span className="dot" style={{ background: PLATFORM_COLORS[p] }} />
-                {p}
+            {Object.entries(CALENDAR_STATUS_STYLE).map(([label, style]) => (
+              <div key={label}>
+                <span className="dot" style={{ background: style.border }} />
+                {label}
               </div>
             ))}
           </div>
@@ -588,13 +633,12 @@ export default function Home() {
               <div className="unscheduled-list">
                 {unscheduledBriefs.map((b) => (
                   <div className="unscheduled-item" key={b.id} onClick={() => enterEditMode(b.id)}>
-                    <span
-                      className="dot"
-                      style={{ background: PLATFORM_COLORS[b.platform] || 'var(--grey)' }}
-                    />
+                    {platformsOf(b).map((p) => (
+                      <span key={p} className="dot" style={{ background: PLATFORM_COLORS[p] || 'var(--grey)' }} />
+                    ))}
                     <span className="unscheduled-brief">{b.brief}</span>
                     <span className="tag">{b.pilar}</span>
-                    <span className="tag">{b.platform}</span>
+                    <span className="tag">{platformLabel(b)}</span>
                     <span className="unscheduled-hint">Klik untuk atur tanggal posting</span>
                   </div>
                 ))}
@@ -734,7 +778,7 @@ export default function Home() {
                           <div className="day-row-item" key={b.id}>
                             <b>{b.brief}</b>
                             <span className="tag">{b.pilar}</span>
-                            <span className="tag">{b.platform}</span>
+                            <span className="tag">{platformLabel(b)}</span>
                           </div>
                         ))}
                       </div>
@@ -791,11 +835,11 @@ export default function Home() {
                     <th>Tanggal Masuk</th>
                     <th>Pilar</th>
                     <th>Platform</th>
-                    <th>Brief</th>
+                    <th>Judul Brief</th>
                     <th>Status</th>
                     <th>Tanggal Selesai</th>
                     <th>KPI</th>
-                    <th>Hasil Akhir</th>
+                    <th>Sumber/Referensi</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -806,7 +850,7 @@ export default function Home() {
                       <tr key={b.id} className={b.id === editingId ? 'is-editing' : ''}>
                         <td>{fmtDate(b.tglMasuk)}</td>
                         <td>{b.pilar}</td>
-                        <td>{b.platform}</td>
+                        <td>{platformLabel(b)}</td>
                         <td>{b.brief}</td>
                         <td><span className={`pill ${pillClass(statusOf(b))}`}>{statusOf(b)}</span></td>
                         <td>{fmtDate(b.tglSelesai)}</td>
@@ -878,23 +922,45 @@ export default function Home() {
                     ))}
                   </select>
                 </div>
-                <div className="field">
-                  <label htmlFor="platform">Platform</label>
-                  <select id="platform" value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })}>
+                <div className="field span2">
+                  <label>Platform</label>
+                  <div className="checkbox-row">
                     {PLATFORMS.map((p) => (
-                      <option key={p} value={p}>{p}</option>
+                      <label key={p} className="checkbox-chip">
+                        <input
+                          type="checkbox"
+                          checked={form.platform.includes(p)}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...form.platform, p]
+                              : form.platform.filter((x) => x !== p);
+                            setForm({ ...form, platform: next });
+                          }}
+                        />
+                        {p}
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 <div className="field span3">
-                  <label htmlFor="briefText">Brief</label>
+                  <label htmlFor="briefText">Judul Brief</label>
                   <input
                     type="text"
                     id="briefText"
-                    placeholder="Nama / deskripsi brief"
+                    placeholder="Judul singkat brief"
                     required
                     value={form.brief}
                     onChange={(e) => setForm({ ...form, brief: e.target.value })}
+                  />
+                </div>
+                <div className="field span3">
+                  <label htmlFor="deskripsiBrief">Deskripsi Brief</label>
+                  <textarea
+                    id="deskripsiBrief"
+                    placeholder="Detail brief: konsep, hook, copy, catatan produksi, dll."
+                    rows={4}
+                    value={form.deskripsiBrief}
+                    onChange={(e) => setForm({ ...form, deskripsiBrief: e.target.value })}
                   />
                 </div>
                 <div className="field">
@@ -926,7 +992,7 @@ export default function Home() {
                 </div>
                 <div className="field span2" />
                 <div className="field span3">
-                  <label htmlFor="hasilAkhir">Hasil Akhir (link atau file)</label>
+                  <label htmlFor="hasilAkhir">Sumber/Referensi (link atau file)</label>
                   <div className="hasil-akhir-row">
                     <input
                       type="text"

@@ -5,11 +5,11 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'PUT') {
-      const { tglMasuk, pilar, platform, brief, status, tglSelesai, hasilAkhir, tglPosting } = req.body || {};
+      const { tglMasuk, pilar, platform, brief, status, tglSelesai, hasilAkhir, tglPosting, deskripsiBrief } = req.body || {};
       if (!tglMasuk || !brief) {
         return res.status(400).json({ error: 'tglMasuk dan brief wajib diisi' });
       }
-      const updated = await updateBrief(id, { tglMasuk, pilar, platform, brief, status, tglSelesai, hasilAkhir, tglPosting });
+      const updated = await updateBrief(id, { tglMasuk, pilar, platform, brief, status, tglSelesai, hasilAkhir, tglPosting, deskripsiBrief });
       return res.status(200).json(updated);
     }
 
