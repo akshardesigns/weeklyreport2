@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 
 const PILARS = ['Ads', 'Feed', 'Story', 'Carousel', 'Video', 'Lainnya'];
@@ -162,6 +162,85 @@ function isSameISODate(a, b) {
 }
 function todayISO() {
   return toISO(new Date());
+}
+
+// --- Helper Import CSV (transisi dari sheet kalender manual lama) ---
+// Format sumbernya: grid mingguan (header Senin..Minggu), lalu baris angka tanggal,
+// lalu baris judul konten, berulang per minggu. Ini best-effort karena formatnya
+// ditulis manual (kadang ada anotasi nama nempel di angka tanggal, mis. "thomas3").
+const CSV_DAY_HEADERS = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
+
+function parseCsvToGrid(text) {
+  const wb = XLSX.read(text, { type: 'string' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+}
+
+function detectContentPlanBlocks(grid) {
+  const blocks = [];
+  let i = 0;
+  while (i < grid.length) {
+    const row = (grid[i] || []).slice(0, 7).map((c) => String(c || '').trim().toLowerCase());
+    const isHeader = CSV_DAY_HEADERS.every((d, idx) => row[idx] === d);
+    if (isHeader) {
+      const weeks = [];
+      let cursor = i + 1;
+      while (cursor + 1 < grid.length) {
+        const dateRow = grid[cursor] || [];
+        const hasDateLike = dateRow
+          .slice(0, 7)
+          .some((c) => /\d{1,2}\s*$/.test(String(c || '').trim()) && String(c || '').trim() !== '');
+        if (!hasDateLike) break;
+        const titleRow = grid[cursor + 1] || [];
+        const days = [];
+        for (let col = 0; col < 7; col++) {
+          const raw = String(dateRow[col] || '').trim();
+          const m = raw.match(/(\d{1,2})\s*$/);
+          if (!m) {
+            days.push(null);
+            continue;
+          }
+          days.push({ dayNum: parseInt(m[1], 10), title: String(titleRow[col] || '').trim() });
+        }
+        weeks.push(days);
+        cursor += 2;
+      }
+      blocks.push({ headerRow: i, weeks });
+      i = cursor > i ? cursor : i + 1;
+    } else {
+      i++;
+    }
+  }
+  return blocks;
+}
+
+function blocksToImportRows(blocks, blockMonths) {
+  const rows = [];
+  let rid = 0;
+  blocks.forEach((block, bIdx) => {
+    const my = blockMonths[bIdx] || '';
+    block.weeks.forEach((week) => {
+      week.forEach((cell) => {
+        if (!cell || !cell.title) return;
+        let tglPosting = '';
+        if (my) {
+          const [y, m] = my.split('-');
+          tglPosting = `${y}-${m}-${String(cell.dayNum).padStart(2, '0')}`;
+        }
+        rows.push({
+          id: `imp-${rid++}`,
+          blockIdx: bIdx,
+          dayNum: cell.dayNum,
+          title: cell.title,
+          tglPosting,
+          include: true,
+          pilar: 'Lainnya',
+          platform: [],
+        });
+      });
+    });
+  });
+  return rows;
 }
 
 export default function Home() {
@@ -498,6 +577,103 @@ export default function Home() {
   const [expandedCell, setExpandedCell] = useState(null);
   const today = todayISO();
 
+  // --- Import CSV (transisi dari sheet kalender manual lama) ---
+  const importFileRef = useRef(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importBlocks, setImportBlocks] = useState([]);
+  const [importBlockMonths, setImportBlockMonths] = useState([]);
+  const [importRows, setImportRows] = useState([]);
+  const [importMsg, setImportMsg] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
+
+  function handleImportFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const grid = parseCsvToGrid(String(reader.result));
+        const blocks = detectContentPlanBlocks(grid);
+        if (blocks.length === 0) {
+          setImportMsg('Tidak menemukan pola grid kalender (header Senin–Minggu) di file ini.');
+          return;
+        }
+        const months = blocks.map(() => '');
+        setImportBlocks(blocks);
+        setImportBlockMonths(months);
+        setImportRows(blocksToImportRows(blocks, months));
+        setImportMsg('');
+        setImportOpen(true);
+      } catch (err) {
+        setImportMsg('Gagal membaca file CSV: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function updateBlockMonth(bIdx, value) {
+    const months = importBlockMonths.slice();
+    months[bIdx] = value;
+    setImportBlockMonths(months);
+    setImportRows(blocksToImportRows(importBlocks, months));
+  }
+
+  function updateImportRow(id, patch) {
+    setImportRows((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  function closeImportModal() {
+    setImportOpen(false);
+    setImportBlocks([]);
+    setImportBlockMonths([]);
+    setImportRows([]);
+    setImportMsg('');
+  }
+
+  async function submitImportRows() {
+    const toImport = importRows.filter((r) => r.include);
+    if (toImport.length === 0) {
+      setImportMsg('Pilih minimal satu brief untuk diimport.');
+      return;
+    }
+    if (toImport.some((r) => !r.tglPosting)) {
+      setImportMsg('Ada brief yang belum punya tanggal — pilih bulan & tahun untuk semua blok dulu.');
+      return;
+    }
+    setImporting(true);
+    setImportMsg('');
+    let done = 0;
+    for (const row of toImport) {
+      done += 1;
+      setImportProgress(`Mengimpor ${done}/${toImport.length}…`);
+      try {
+        await fetch('/api/briefs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tglMasuk: todayISO(),
+            pilar: row.pilar,
+            platform: row.platform.join(','),
+            brief: row.title,
+            deskripsiBrief: '',
+            status: '',
+            tglSelesai: '',
+            hasilAkhir: '',
+            tglPosting: row.tglPosting,
+          }),
+        });
+      } catch (err) {
+        // lanjut ke brief berikutnya walau satu gagal, biar tidak stuck
+      }
+    }
+    setImporting(false);
+    setImportProgress('');
+    await loadBriefs();
+    closeImportModal();
+  }
+
   return (
     <div className="wrap">
       <header>
@@ -566,7 +742,18 @@ export default function Home() {
             >
               Bulan Ini
             </button>
+            <button className="btn btn-outline btn-sm" onClick={() => importFileRef.current?.click()}>
+              Import CSV
+            </button>
+            <input
+              type="file"
+              accept=".csv"
+              ref={importFileRef}
+              style={{ display: 'none' }}
+              onChange={handleImportFileChange}
+            />
           </div>
+          {importMsg && !importOpen && <p className="msg">{importMsg}</p>}
 
           <div className="calendar-grid">
             {DAY_LABELS.map((d) => (
@@ -1031,6 +1218,96 @@ export default function Home() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {importOpen && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && closeImportModal()}>
+          <div className="modal-card import-modal-card">
+            <div className="form-head">
+              <h3>Import CSV — Content Plan Lama</h3>
+              <button className="modal-close" onClick={closeImportModal} title="Tutup">✕</button>
+            </div>
+
+            <p className="import-hint">
+              Terdeteksi {importBlocks.length} blok kalender di file ini. Pilih bulan &amp; tahun tiap blok
+              supaya tanggal postingnya benar, lalu cek daftar di bawah sebelum diimport — brief hasil import
+              belum punya platform/status, tinggal dilengkapi lewat edit brief seperti biasa.
+            </p>
+
+            <div className="import-blocks">
+              {importBlocks.map((block, bIdx) => (
+                <div className="import-block" key={bIdx}>
+                  <span>Blok {bIdx + 1} ({block.weeks.length} minggu)</span>
+                  <input
+                    type="month"
+                    value={importBlockMonths[bIdx] || ''}
+                    onChange={(e) => updateBlockMonth(bIdx, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="import-rows">
+              {importRows.length === 0 ? (
+                <div className="empty">Tidak ada judul konten yang terbaca dari file ini.</div>
+              ) : (
+                importRows.map((row) => (
+                  <div className={`import-row${row.include ? '' : ' is-excluded'}`} key={row.id}>
+                    <input
+                      type="checkbox"
+                      checked={row.include}
+                      onChange={(e) => updateImportRow(row.id, { include: e.target.checked })}
+                    />
+                    <input
+                      type="date"
+                      value={row.tglPosting}
+                      onChange={(e) => updateImportRow(row.id, { tglPosting: e.target.value })}
+                    />
+                    <input
+                      type="text"
+                      className="import-row-title"
+                      value={row.title}
+                      onChange={(e) => updateImportRow(row.id, { title: e.target.value })}
+                    />
+                    <select
+                      value={row.pilar}
+                      onChange={(e) => updateImportRow(row.id, { pilar: e.target.value })}
+                    >
+                      {PILARS.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                    <div className="checkbox-row">
+                      {PLATFORMS.map((p) => (
+                        <label key={p} className="checkbox-chip checkbox-chip-sm">
+                          <input
+                            type="checkbox"
+                            checked={row.platform.includes(p)}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...row.platform, p]
+                                : row.platform.filter((x) => x !== p);
+                              updateImportRow(row.id, { platform: next });
+                            }}
+                          />
+                          {p}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {importMsg && <div className="msg">{importMsg}</div>}
+            <div className="form-actions">
+              <button type="button" className="btn btn-ghost" onClick={closeImportModal}>Batal</button>
+              <button type="button" className="btn btn-primary" onClick={submitImportRows} disabled={importing}>
+                {importing ? importProgress || 'Mengimpor…' : `Import ${importRows.filter((r) => r.include).length} Brief`}
+              </button>
+            </div>
           </div>
         </div>
       )}
