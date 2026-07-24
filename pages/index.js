@@ -268,7 +268,8 @@ function detectContentPlanBlocks(grid) {
   return blocks;
 }
 
-function blocksToImportRows(blocks, blockMonths) {
+function blocksToImportRows(blocks, blockMonths, existingBriefs = []) {
+  const existingSet = new Set(existingBriefs.map((b) => (b.brief || '').trim().toLowerCase()));
   const rows = [];
   let rid = 0;
   blocks.forEach((block, bIdx) => {
@@ -281,13 +282,15 @@ function blocksToImportRows(blocks, blockMonths) {
           const [y, m] = my.split('-');
           tglPosting = `${y}-${m}-${String(cell.dayNum).padStart(2, '0')}`;
         }
+        const alreadyExists = existingSet.has((cell.title || '').trim().toLowerCase());
         rows.push({
           id: `imp-${rid++}`,
           blockIdx: bIdx,
           dayNum: cell.dayNum,
           title: cell.title,
           tglPosting,
-          include: true,
+          include: !alreadyExists,
+          alreadyExists,
           pilar: 'Lainnya',
           platform: [],
         });
@@ -697,7 +700,7 @@ export default function Home() {
         const months = blocks.map(() => '');
         setImportBlocks(blocks);
         setImportBlockMonths(months);
-        setImportRows(blocksToImportRows(blocks, months));
+        setImportRows(blocksToImportRows(blocks, months, briefs));
         setImportMsg('');
         setImportAsReference(true);
         setImportOpen(true);
@@ -712,7 +715,7 @@ export default function Home() {
     const months = importBlockMonths.slice();
     months[bIdx] = value;
     setImportBlockMonths(months);
-    setImportRows(blocksToImportRows(importBlocks, months));
+    setImportRows(blocksToImportRows(importBlocks, months, briefs));
   }
 
   function updateImportRow(id, patch) {
@@ -728,9 +731,10 @@ export default function Home() {
   }
 
   async function submitImportRows() {
-    const toImport = importRows.filter((r) => r.include);
+    const existingTitles = new Set(briefs.map((b) => (b.brief || '').trim().toLowerCase()));
+    const toImport = importRows.filter((r) => r.include && !existingTitles.has((r.title || '').trim().toLowerCase()));
     if (toImport.length === 0) {
-      setImportMsg('Pilih minimal satu brief untuk diimport.');
+      setImportMsg('Semua brief yang dipilih sudah ada di dashboard atau tidak ada brief baru untuk diimport.');
       return;
     }
     if (toImport.some((r) => !r.tglPosting)) {
@@ -1431,12 +1435,20 @@ export default function Home() {
                       value={row.tglPosting}
                       onChange={(e) => updateImportRow(row.id, { tglPosting: e.target.value })}
                     />
-                    <input
-                      type="text"
-                      className="import-row-title"
-                      value={row.title}
-                      onChange={(e) => updateImportRow(row.id, { title: e.target.value })}
-                    />
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 160 }}>
+                      <input
+                        type="text"
+                        className="import-row-title"
+                        style={{ flex: 1 }}
+                        value={row.title}
+                        onChange={(e) => updateImportRow(row.id, { title: e.target.value })}
+                      />
+                      {row.alreadyExists && (
+                        <span style={{ fontSize: 11, background: 'rgba(255,149,0,0.12)', color: '#d97706', padding: '3px 7px', borderRadius: 6, fontWeight: 500, whiteSpace: 'nowrap' }} title="Brief ini sudah ada di dashboard sehingga otomatis tidak tercentang/dilewati">
+                          ⚠️ Sudah Ada
+                        </span>
+                      )}
+                    </div>
                     <select
                       value={row.pilar}
                       onChange={(e) => updateImportRow(row.id, { pilar: e.target.value })}
