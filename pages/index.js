@@ -866,10 +866,10 @@ export default function Home() {
                             e.stopPropagation();
                             enterEditMode(b.id);
                           }}
-                          title={`${it.platform || platformLabel(b)} · ${b.pilar} · ${b.brief} — ${statusOf(b)}`}
+                          title={`${it.platform || platformLabel(b)} · ${pilarDisplayLabel(it.platform, b.pilar)} · ${b.brief} — ${statusOf(b)}`}
                         >
                           <span className="calendar-item-badge" style={{ background: badgeColor }}>
-                            {label} · {b.pilar}
+                            {label} · {pilarDisplayLabel(it.platform, b.pilar)}
                           </span>
                           <div className="calendar-item-title">{b.brief}</div>
                         </div>
