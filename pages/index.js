@@ -14,7 +14,8 @@ const EMPTY_FORM = {
   status: '',
   tglSelesai: '',
   hasilAkhir: '',
-  tglPosting: '',
+  tglPostingByPlatform: {},
+  _prefillDate: '',
 };
 
 const PLATFORM_COLORS = {
@@ -34,6 +35,23 @@ function platformsOf(b) {
 function platformLabel(b) {
   const list = platformsOf(b);
   return list.length ? list.join(' + ') : '-';
+}
+
+// Pasangkan tiap platform dengan tanggal postingnya masing-masing.
+// tglPosting disimpan sejajar urutan dengan platform (dipisah koma), mis.
+// platform="Instagram,Tiktok" & tglPosting="2026-08-01,2026-08-03".
+// Data lama yang cuma punya 1 tanggal untuk banyak platform tetap dianggap
+// tanggal yang sama untuk semua platform (backward-compatible).
+function platformDatePairs(b) {
+  const plats = platformsOf(b);
+  const dates = (b.tglPosting || '').split(',').map((s) => s.trim());
+  if (plats.length === 0) {
+    return [{ platform: '', date: dates[0] || '' }];
+  }
+  if (dates.length <= 1 && plats.length > 1) {
+    return plats.map((p) => ({ platform: p, date: dates[0] || '' }));
+  }
+  return plats.map((p, i) => ({ platform: p, date: dates[i] || '' }));
 }
 
 // Warna kartu di Kalender Konten mengikuti status brief.
@@ -344,6 +362,10 @@ export default function Home() {
     const b = briefs.find((x) => x.id === id);
     if (!b) return;
     setEditingId(id);
+    const datesMap = {};
+    platformDatePairs(b).forEach((pr) => {
+      if (pr.platform) datesMap[pr.platform] = pr.date || '';
+    });
     setForm({
       tglMasuk: b.tglMasuk,
       pilar: b.pilar,
@@ -353,7 +375,8 @@ export default function Home() {
       status: b.status,
       tglSelesai: b.tglSelesai || '',
       hasilAkhir: b.hasilAkhir || '',
-      tglPosting: b.tglPosting || '',
+      tglPostingByPlatform: datesMap,
+      _prefillDate: '',
     });
     setFormMsg('');
     setUploadedFileName('');
@@ -425,7 +448,18 @@ export default function Home() {
     }
     setFormMsg('');
     setSaving(true);
-    const payload = { ...form, platform: form.platform.join(',') };
+    const platformDates = form.platform.map((p) => (form.tglPostingByPlatform[p] || '').trim());
+    const payload = {
+      tglMasuk: form.tglMasuk,
+      pilar: form.pilar,
+      platform: form.platform.join(','),
+      brief: form.brief,
+      deskripsiBrief: form.deskripsiBrief,
+      status: form.status,
+      tglSelesai: form.tglSelesai,
+      hasilAkhir: form.hasilAkhir,
+      tglPosting: platformDates.join(','),
+    };
     try {
       if (editingId) {
         const res = await fetch(`/api/briefs/${editingId}`, {
@@ -484,7 +518,10 @@ export default function Home() {
         'Deskripsi Brief': b.deskripsiBrief || '',
         Status: b.status,
         'Tanggal Selesai': b.tglSelesai,
-        'Tanggal Posting': b.tglPosting || '',
+        'Tanggal Posting': platformDatePairs(b)
+          .filter((pr) => pr.date)
+          .map((pr) => `${pr.platform || 'Posting'}: ${pr.date}`)
+          .join(' | '),
         KPI: kpiFor(b) || '',
         'Sumber/Referensi': b.hasilAkhir || '',
       }));
@@ -559,18 +596,23 @@ export default function Home() {
 
   const sortedBriefs = tableBriefs.slice().sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk));
 
-  // ------ Kalender Konten: grouping brief berdasarkan tglPosting ------
+  // ------ Kalender Konten: grouping brief berdasarkan tglPosting per platform ------
   const postingByDate = useMemo(() => {
     const map = {};
     briefs.forEach((b) => {
-      if (!b.tglPosting) return;
-      if (!map[b.tglPosting]) map[b.tglPosting] = [];
-      map[b.tglPosting].push(b);
+      platformDatePairs(b).forEach((pr) => {
+        if (!pr.date) return;
+        if (!map[pr.date]) map[pr.date] = [];
+        map[pr.date].push({ brief: b, platform: pr.platform });
+      });
     });
     return map;
   }, [briefs]);
   const unscheduledBriefs = useMemo(
-    () => briefs.filter((b) => !b.tglPosting).sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk)),
+    () =>
+      briefs
+        .filter((b) => platformDatePairs(b).every((pr) => !pr.date))
+        .sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk)),
     [briefs]
   );
   const monthGrid = useMemo(() => buildMonthGrid(calendarMonth), [calendarMonth]);
@@ -766,25 +808,27 @@ export default function Home() {
                 <div
                   key={cell.iso}
                   className={`calendar-cell${cell.inMonth ? '' : ' is-outside'}${cell.iso === today ? ' is-today' : ''}`}
-                  onDoubleClick={() => openAddForm({ tglPosting: cell.iso })}
+                  onDoubleClick={() => openAddForm({ _prefillDate: cell.iso })}
                   title="Klik dua kali untuk tambah brief di tanggal ini"
                 >
                   <div className="calendar-cell-date">{cell.date.getDate()}</div>
                   <div className="calendar-cell-items">
-                    {(isOpen ? items : items.slice(0, 3)).map((b) => {
+                    {(isOpen ? items : items.slice(0, 3)).map((it, idx) => {
+                      const b = it.brief;
                       const style = CALENDAR_STATUS_STYLE[statusOf(b)] || CALENDAR_STATUS_STYLE['Belum Dikerjakan'];
+                      const label = it.platform || platformLabel(b);
                       return (
                         <div
-                          key={b.id}
+                          key={`${b.id}-${it.platform}-${idx}`}
                           className="calendar-item"
                           style={{ background: style.bg, borderLeftColor: style.border }}
                           onClick={(e) => {
                             e.stopPropagation();
                             enterEditMode(b.id);
                           }}
-                          title={`${platformLabel(b)} · ${b.pilar} · ${b.brief} — ${statusOf(b)}`}
+                          title={`${label} · ${b.pilar} · ${b.brief} — ${statusOf(b)}`}
                         >
-                          <div className="calendar-item-platform">{platformLabel(b)} · {b.pilar}</div>
+                          <div className="calendar-item-platform">{label} · {b.pilar}</div>
                           <div className="calendar-item-title">{b.brief}</div>
                         </div>
                       );
@@ -1123,10 +1167,15 @@ export default function Home() {
                           type="checkbox"
                           checked={form.platform.includes(p)}
                           onChange={(e) => {
-                            const next = e.target.checked
+                            const checked = e.target.checked;
+                            const next = checked
                               ? [...form.platform, p]
                               : form.platform.filter((x) => x !== p);
-                            setForm({ ...form, platform: next });
+                            const datesMap = { ...form.tglPostingByPlatform };
+                            if (checked && !datesMap[p] && form._prefillDate) {
+                              datesMap[p] = form._prefillDate;
+                            }
+                            setForm({ ...form, platform: next, tglPostingByPlatform: datesMap });
                           }}
                         />
                         {p}
@@ -1173,16 +1222,30 @@ export default function Home() {
                     onChange={(e) => setForm({ ...form, tglSelesai: e.target.value })}
                   />
                 </div>
-                <div className="field">
-                  <label htmlFor="tglPosting">Tanggal Posting</label>
-                  <input
-                    type="date"
-                    id="tglPosting"
-                    value={form.tglPosting}
-                    onChange={(e) => setForm({ ...form, tglPosting: e.target.value })}
-                  />
+                <div className="field span3">
+                  <label>Tanggal Posting per Platform</label>
+                  {form.platform.length === 0 ? (
+                    <p className="posting-date-empty">Pilih platform dulu untuk atur tanggal postingnya.</p>
+                  ) : (
+                    <div className="posting-date-row">
+                      {form.platform.map((p) => (
+                        <div className="posting-date-item" key={p}>
+                          <span>{p}</span>
+                          <input
+                            type="date"
+                            value={form.tglPostingByPlatform[p] || ''}
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                tglPostingByPlatform: { ...form.tglPostingByPlatform, [p]: e.target.value },
+                              })
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="field span2" />
                 <div className="field span3">
                   <label htmlFor="hasilAkhir">Sumber/Referensi (link atau file)</label>
                   <div className="hasil-akhir-row">
