@@ -16,6 +16,7 @@ const EMPTY_FORM = {
   hasilAkhir: '',
   tglPostingByPlatform: {},
   _prefillDate: '',
+  isReference: false,
 };
 
 const PLATFORM_COLORS = {
@@ -350,8 +351,9 @@ export default function Home() {
   }, []);
 
   const filteredBriefs = useMemo(() => {
-    if (weekFilter === null) return briefs;
-    return briefs.filter((b) => isInWeek(b.tglMasuk, weekFilter));
+    const list = briefs.filter((b) => b.isReference !== 'true' && b.isReference !== true);
+    if (weekFilter === null) return list;
+    return list.filter((b) => isInWeek(b.tglMasuk, weekFilter));
   }, [briefs, weekFilter]);
 
   // brief selesai, dikelompokkan per tanggal selesai (turun dari yang paling baru)
@@ -412,6 +414,7 @@ export default function Home() {
       hasilAkhir: b.hasilAkhir || '',
       tglPostingByPlatform: datesMap,
       _prefillDate: '',
+      isReference: b.isReference === 'true' || b.isReference === true,
     });
     setFormMsg('');
     setUploadedFileName('');
@@ -494,6 +497,7 @@ export default function Home() {
       tglSelesai: form.tglSelesai,
       hasilAkhir: form.hasilAkhir,
       tglPosting: platformDates.join(','),
+      isReference: form.isReference ? 'true' : 'false',
     };
     try {
       if (editingId) {
@@ -675,6 +679,7 @@ export default function Home() {
   const [importMsg, setImportMsg] = useState('');
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState('');
+  const [importAsReference, setImportAsReference] = useState(true);
 
   function handleImportFileChange(e) {
     const file = e.target.files && e.target.files[0];
@@ -694,6 +699,7 @@ export default function Home() {
         setImportBlockMonths(months);
         setImportRows(blocksToImportRows(blocks, months));
         setImportMsg('');
+        setImportAsReference(true);
         setImportOpen(true);
       } catch (err) {
         setImportMsg('Gagal membaca file CSV: ' + err.message);
@@ -742,7 +748,7 @@ export default function Home() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            tglMasuk: todayISO(),
+            tglMasuk: row.tglPosting || todayISO(),
             pilar: row.pilar,
             platform: row.platform.join(','),
             brief: row.title,
@@ -751,6 +757,7 @@ export default function Home() {
             tglSelesai: '',
             hasilAkhir: '',
             tglPosting: row.tglPosting,
+            isReference: importAsReference ? 'true' : 'false',
           }),
         });
       } catch (err) {
@@ -865,19 +872,24 @@ export default function Home() {
                       const style = CALENDAR_STATUS_STYLE[statusOf(b)] || CALENDAR_STATUS_STYLE['Belum Dikerjakan'];
                       const label = it.platform ? platformAbbr(it.platform) : platformLabel(b);
                       const badgeColor = formatColor(it.platform);
+                      const isRef = b.isReference === 'true' || b.isReference === true;
                       return (
                         <div
                           key={`${b.id}-${it.platform}-${idx}`}
-                          className="calendar-item"
-                          style={{ background: style.bg, borderLeftColor: style.border }}
+                          className={`calendar-item${isRef ? ' is-reference' : ''}`}
+                          style={{
+                            background: isRef ? '#f4f4f6' : style.bg,
+                            borderLeftColor: isRef ? '#8e8e93' : style.border,
+                            ...(isRef ? { borderLeftWidth: '3px', opacity: 0.88 } : {}),
+                          }}
                           onClick={(e) => {
                             e.stopPropagation();
                             enterEditMode(b.id);
                           }}
-                          title={`${it.platform || platformLabel(b)} · ${pilarDisplayLabel(it.platform, b.pilar)} · ${b.brief} — ${statusOf(b)}`}
+                          title={`${isRef ? '[Transisi/Referensi] ' : ''}${it.platform || platformLabel(b)} · ${pilarDisplayLabel(it.platform, b.pilar)} · ${b.brief} — ${statusOf(b)}`}
                         >
-                          <span className="calendar-item-badge" style={{ background: badgeColor }}>
-                            {label} · {pilarDisplayLabel(it.platform, b.pilar)}
+                          <span className="calendar-item-badge" style={{ background: isRef ? '#6e6e73' : badgeColor }}>
+                            {isRef ? '📌 ' : ''}{label} · {pilarDisplayLabel(it.platform, b.pilar)}
                           </span>
                           <div className="calendar-item-title">{b.brief}</div>
                         </div>
@@ -899,6 +911,17 @@ export default function Home() {
             })}
           </div>
 
+          <div className="calendar-legend">
+            <span className="calendar-legend-title">Jenis &amp; Status:</span>
+            <div>
+              <span className="dot" style={{ background: '#0071e3' }} />
+              Brief KPI Utama
+            </div>
+            <div>
+              <span className="dot" style={{ background: '#8e8e93' }} />
+              📌 Data Transisi/Referensi (Abaikan dari KPI Dashboard)
+            </div>
+          </div>
           <div className="calendar-legend">
             <span className="calendar-legend-title">Warna sel = status:</span>
             {Object.entries(CALENDAR_STATUS_STYLE).map(([label, style]) => (
@@ -1332,6 +1355,16 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+                <div className="field span3">
+                  <label className="checkbox-chip" style={{ background: 'var(--bg)', border: '1px solid var(--hair)', padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={form.isReference}
+                      onChange={(e) => setForm({ ...form, isReference: e.target.checked })}
+                    />
+                    <span><b>Data Transisi / Referensi Kalender</b> (Abaikan dari Total Brief &amp; KPI Dashboard)</span>
+                  </label>
+                </div>
               </div>
               <div className="msg">{formMsg}</div>
               <div className="form-actions">
@@ -1355,9 +1388,19 @@ export default function Home() {
 
             <p className="import-hint">
               Terdeteksi {importBlocks.length} blok kalender di file ini. Pilih bulan &amp; tahun tiap blok
-              supaya tanggal postingnya benar, lalu cek daftar di bawah sebelum diimport — brief hasil import
-              belum punya platform/status, tinggal dilengkapi lewat edit brief seperti biasa.
+              supaya tanggal postingnya benar, lalu cek daftar di bawah sebelum diimport.
             </p>
+
+            <div style={{ background: 'rgba(0,113,227,0.06)', border: '1px solid rgba(0,113,227,0.18)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', fontWeight: 500, color: 'var(--ink)' }}>
+                <input
+                  type="checkbox"
+                  checked={importAsReference}
+                  onChange={(e) => setImportAsReference(e.target.checked)}
+                />
+                <span>Impor sebagai <b>Data Transisi / Referensi Kalender</b> (Hanya tampil di Kalender Konten, tidak dihitung pada KPI Dashboard)</span>
+              </label>
+            </div>
 
             <div className="import-blocks">
               {importBlocks.map((block, bIdx) => (
