@@ -30,15 +30,12 @@ function platformAbbr(p) {
   return PLATFORM_ABBR[p] || p;
 }
 
-// Warna badge kombinasi platform + pilar (format konten), supaya "IG Story" vs
-// "IG Feed" vs "Tiktok Video" dst kelihatan beda tanpa harus baca teksnya dulu.
-const FORMAT_COLORS = {
-  Instagram: { Ads: '#007aff', Feed: '#af52de', Story: '#ff2d55', Carousel: '#ff9500', Video: '#5856d6', Lainnya: '#8e8e93' },
-  Tiktok: { Ads: '#0071e3', Feed: '#32ade6', Story: '#5ac8fa', Carousel: '#34c759', Video: '#00c7be', Lainnya: '#8e8e93' },
-  'Non sosmed': { Ads: '#8e8e93', Feed: '#8e8e93', Story: '#8e8e93', Carousel: '#8e8e93', Video: '#8e8e93', Lainnya: '#8e8e93' },
-};
-function formatColor(platform, pilar) {
-  return (FORMAT_COLORS[platform] && FORMAT_COLORS[platform][pilar]) || '#8e8e93';
+// Warna badge platform di Kalender Konten — pakai warna khas brand masing-masing,
+// nggak berubah walau format kontennya (Feed/Story/Carousel/Video) beda.
+function formatColor(platform) {
+  if (platform === 'Instagram') return 'linear-gradient(135deg, #833ab4, #e1306c)';
+  if (platform === 'Tiktok') return '#000000';
+  return '#8e8e93';
 }
 
 // platform disimpan di Sheets sebagai string dipisah koma ("Instagram,Tiktok")
@@ -834,7 +831,7 @@ export default function Home() {
                       const b = it.brief;
                       const style = CALENDAR_STATUS_STYLE[statusOf(b)] || CALENDAR_STATUS_STYLE['Belum Dikerjakan'];
                       const label = it.platform ? platformAbbr(it.platform) : platformLabel(b);
-                      const badgeColor = formatColor(it.platform, b.pilar);
+                      const badgeColor = formatColor(it.platform);
                       return (
                         <div
                           key={`${b.id}-${it.platform}-${idx}`}
@@ -879,15 +876,13 @@ export default function Home() {
             ))}
           </div>
           <div className="calendar-legend">
-            <span className="calendar-legend-title">Warna badge = format konten:</span>
-            {PLATFORMS.flatMap((p) =>
-              PILARS.map((pl) => (
-                <div key={`${p}-${pl}`}>
-                  <span className="dot" style={{ background: formatColor(p, pl) }} />
-                  {platformAbbr(p)} {pl}
-                </div>
-              ))
-            )}
+            <span className="calendar-legend-title">Warna badge = platform:</span>
+            {PLATFORMS.map((p) => (
+              <div key={p}>
+                <span className="dot" style={{ background: formatColor(p) }} />
+                {platformAbbr(p)}
+              </div>
+            ))}
           </div>
 
           <div className="list-panel" style={{ marginTop: 24 }}>
