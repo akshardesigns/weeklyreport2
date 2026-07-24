@@ -30,6 +30,13 @@ function platformAbbr(p) {
   return PLATFORM_ABBR[p] || p;
 }
 
+// Urutan tampil platform di Kalender Konten: Instagram selalu di atas, baru Tiktok,
+// platform lain menyusul di bawahnya.
+const PLATFORM_ORDER = { Instagram: 0, Tiktok: 1 };
+function PLATFORM_ORDER_INDEX(platform) {
+  return platform in PLATFORM_ORDER ? PLATFORM_ORDER[platform] : 99;
+}
+
 // Warna badge platform di Kalender Konten — pakai warna khas brand masing-masing,
 // nggak berubah walau format kontennya (Feed/Story/Carousel/Video) beda.
 function formatColor(platform) {
@@ -619,6 +626,10 @@ export default function Home() {
         if (!map[pr.date]) map[pr.date] = [];
         map[pr.date].push({ brief: b, platform: pr.platform });
       });
+    });
+    // Urutkan item tiap tanggal: Instagram dulu, baru Tiktok, sisanya menyusul.
+    Object.keys(map).forEach((date) => {
+      map[date].sort((a, b) => PLATFORM_ORDER_INDEX(a.platform) - PLATFORM_ORDER_INDEX(b.platform));
     });
     return map;
   }, [briefs]);
