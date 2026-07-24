@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 
-const PILARS = ['Ads', 'Feed', 'Story', 'Carousel', 'Reels', 'Lainnya'];
+const PILARS = ['Ads', 'Feed', 'Story', 'Carousel', 'Video', 'Lainnya'];
 const PLATFORMS = ['Instagram', 'Tiktok', 'Non sosmed'];
 const STATUS_OPTIONS = ['On Going', 'Waiting Approval', 'Selesai Terupload'];
 
@@ -38,13 +38,21 @@ function PLATFORM_ORDER_INDEX(platform) {
 }
 
 // Untuk item Instagram, urutkan lagi berdasarkan format/pilar: Story, Carousel, Feed, Reels.
-const IG_PILAR_ORDER = { Story: 0, Carousel: 1, Feed: 2, Reels: 3 };
+// (nilai pilar yang tersimpan tetap "Video" karena dipakai bareng sama Tiktok)
+const IG_PILAR_ORDER = { Story: 0, Carousel: 1, Feed: 2, Video: 3 };
 function IG_PILAR_ORDER_INDEX(pilar) {
   return pilar in IG_PILAR_ORDER ? IG_PILAR_ORDER[pilar] : 99;
 }
 
+// Label pilar khusus tampilan: pilar "Video" ditampilkan sebagai "Reels" kalau platform-nya
+// Instagram, tapi tetap "Video" kalau Tiktok (satu nilai data, beda istilah per platform).
+function pilarDisplayLabel(platform, pilar) {
+  if (platform === 'Instagram' && pilar === 'Video') return 'Reels';
+  return pilar;
+}
+
 // Warna badge platform di Kalender Konten — pakai warna khas brand masing-masing,
-// nggak berubah walau format kontennya (Feed/Story/Carousel/Reels) beda.
+// nggak berubah walau format kontennya (Feed/Story/Carousel/Video) beda.
 function formatColor(platform) {
   if (platform === 'Instagram') return 'linear-gradient(135deg, #833ab4, #e1306c)';
   if (platform === 'Tiktok') return '#000000';
