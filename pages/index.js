@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 
-const PILARS = ['Ads', 'Feed', 'Story', 'Carousel', 'Video', 'Lainnya'];
+const PILARS = ['Ads', 'Feed', 'Story', 'Carousel', 'Reels', 'Lainnya'];
 const PLATFORMS = ['Instagram', 'Tiktok', 'Non sosmed'];
 const STATUS_OPTIONS = ['On Going', 'Waiting Approval', 'Selesai Terupload'];
 
@@ -37,8 +37,14 @@ function PLATFORM_ORDER_INDEX(platform) {
   return platform in PLATFORM_ORDER ? PLATFORM_ORDER[platform] : 99;
 }
 
+// Untuk item Instagram, urutkan lagi berdasarkan format/pilar: Story, Carousel, Feed, Reels.
+const IG_PILAR_ORDER = { Story: 0, Carousel: 1, Feed: 2, Reels: 3 };
+function IG_PILAR_ORDER_INDEX(pilar) {
+  return pilar in IG_PILAR_ORDER ? IG_PILAR_ORDER[pilar] : 99;
+}
+
 // Warna badge platform di Kalender Konten — pakai warna khas brand masing-masing,
-// nggak berubah walau format kontennya (Feed/Story/Carousel/Video) beda.
+// nggak berubah walau format kontennya (Feed/Story/Carousel/Reels) beda.
 function formatColor(platform) {
   if (platform === 'Instagram') return 'linear-gradient(135deg, #833ab4, #e1306c)';
   if (platform === 'Tiktok') return '#000000';
@@ -584,7 +590,7 @@ export default function Home() {
     Feed: '#af52de',
     Story: '#ff375f',
     Carousel: '#64d2ff',
-    Video: '#ff9500',
+    Reels: '#ff9500',
     Lainnya: '#8e8e93',
   };
   const pilarCounts = PILARS.map((name) => ({
@@ -627,9 +633,17 @@ export default function Home() {
         map[pr.date].push({ brief: b, platform: pr.platform });
       });
     });
-    // Urutkan item tiap tanggal: Instagram dulu, baru Tiktok, sisanya menyusul.
+    // Urutkan item tiap tanggal: Instagram dulu (Story > Carousel > Feed > Reels),
+    // baru Tiktok, sisanya menyusul.
     Object.keys(map).forEach((date) => {
-      map[date].sort((a, b) => PLATFORM_ORDER_INDEX(a.platform) - PLATFORM_ORDER_INDEX(b.platform));
+      map[date].sort((a, b) => {
+        const platformDiff = PLATFORM_ORDER_INDEX(a.platform) - PLATFORM_ORDER_INDEX(b.platform);
+        if (platformDiff !== 0) return platformDiff;
+        if (a.platform === 'Instagram') {
+          return IG_PILAR_ORDER_INDEX(a.brief.pilar) - IG_PILAR_ORDER_INDEX(b.brief.pilar);
+        }
+        return 0;
+      });
     });
     return map;
   }, [briefs]);
@@ -746,7 +760,7 @@ export default function Home() {
       <header>
         <div>
           <h1>Content Production</h1>
-          <p>Target: Ads &amp; Carousel maks. 2 hari · Video &amp; Lainnya maks. 3 hari</p>
+          <p>Target: Ads &amp; Carousel maks. 2 hari · Reels &amp; Lainnya maks. 3 hari</p>
         </div>
         <div className="header-actions">
           <div className="view-switch">
