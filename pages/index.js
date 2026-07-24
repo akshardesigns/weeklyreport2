@@ -24,6 +24,23 @@ const PLATFORM_COLORS = {
   'Non sosmed': '#8e8e93',
 };
 
+// Singkatan platform khusus tampilan Kalender Konten, biar ringkas.
+const PLATFORM_ABBR = { Instagram: 'IG', Tiktok: 'Tiktok', 'Non sosmed': 'Non-Sosmed' };
+function platformAbbr(p) {
+  return PLATFORM_ABBR[p] || p;
+}
+
+// Warna badge kombinasi platform + pilar (format konten), supaya "IG Story" vs
+// "IG Feed" vs "Tiktok Video" dst kelihatan beda tanpa harus baca teksnya dulu.
+const FORMAT_COLORS = {
+  Instagram: { Ads: '#007aff', Feed: '#af52de', Story: '#ff2d55', Carousel: '#ff9500', Video: '#5856d6', Lainnya: '#8e8e93' },
+  Tiktok: { Ads: '#0071e3', Feed: '#32ade6', Story: '#5ac8fa', Carousel: '#34c759', Video: '#00c7be', Lainnya: '#8e8e93' },
+  'Non sosmed': { Ads: '#8e8e93', Feed: '#8e8e93', Story: '#8e8e93', Carousel: '#8e8e93', Video: '#8e8e93', Lainnya: '#8e8e93' },
+};
+function formatColor(platform, pilar) {
+  return (FORMAT_COLORS[platform] && FORMAT_COLORS[platform][pilar]) || '#8e8e93';
+}
+
 // platform disimpan di Sheets sebagai string dipisah koma ("Instagram,Tiktok")
 // supaya satu brief bisa menyasar lebih dari satu platform sekaligus.
 function platformsOf(b) {
@@ -816,7 +833,8 @@ export default function Home() {
                     {(isOpen ? items : items.slice(0, 3)).map((it, idx) => {
                       const b = it.brief;
                       const style = CALENDAR_STATUS_STYLE[statusOf(b)] || CALENDAR_STATUS_STYLE['Belum Dikerjakan'];
-                      const label = it.platform || platformLabel(b);
+                      const label = it.platform ? platformAbbr(it.platform) : platformLabel(b);
+                      const badgeColor = formatColor(it.platform, b.pilar);
                       return (
                         <div
                           key={`${b.id}-${it.platform}-${idx}`}
@@ -826,9 +844,11 @@ export default function Home() {
                             e.stopPropagation();
                             enterEditMode(b.id);
                           }}
-                          title={`${label} · ${b.pilar} · ${b.brief} — ${statusOf(b)}`}
+                          title={`${it.platform || platformLabel(b)} · ${b.pilar} · ${b.brief} — ${statusOf(b)}`}
                         >
-                          <div className="calendar-item-platform">{label} · {b.pilar}</div>
+                          <span className="calendar-item-badge" style={{ background: badgeColor }}>
+                            {label} · {b.pilar}
+                          </span>
                           <div className="calendar-item-title">{b.brief}</div>
                         </div>
                       );
@@ -850,12 +870,24 @@ export default function Home() {
           </div>
 
           <div className="calendar-legend">
+            <span className="calendar-legend-title">Warna sel = status:</span>
             {Object.entries(CALENDAR_STATUS_STYLE).map(([label, style]) => (
               <div key={label}>
                 <span className="dot" style={{ background: style.border }} />
                 {label}
               </div>
             ))}
+          </div>
+          <div className="calendar-legend">
+            <span className="calendar-legend-title">Warna badge = format konten:</span>
+            {PLATFORMS.flatMap((p) =>
+              PILARS.map((pl) => (
+                <div key={`${p}-${pl}`}>
+                  <span className="dot" style={{ background: formatColor(p, pl) }} />
+                  {platformAbbr(p)} {pl}
+                </div>
+              ))
+            )}
           </div>
 
           <div className="list-panel" style={{ marginTop: 24 }}>
