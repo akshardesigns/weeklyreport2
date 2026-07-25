@@ -230,6 +230,16 @@ function parseCsvToGrid(text) {
   return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 }
 
+// Pecah isi 1 sel jadi beberapa judul brief terpisah. Satu sel bisa berisi lebih
+// dari 1 brief kalau user menekan Enter/Alt+Enter di dalam sel yang sama di Sheets
+// (jadi ada line break literal di dalam cell saat diexport ke CSV).
+function splitCellTitles(raw) {
+  return String(raw || '')
+    .split(/\r\n|\r|\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function detectContentPlanBlocks(grid) {
   const blocks = [];
   let i = 0;
@@ -248,13 +258,24 @@ function detectContentPlanBlocks(grid) {
         const titleRow = grid[cursor + 1] || [];
         const days = [];
         for (let col = 0; col < 7; col++) {
-          const raw = String(dateRow[col] || '').trim();
-          const m = raw.match(/(\d{1,2})\s*$/);
+          const rawDateCell = String(dateRow[col] || '');
+          // Ambil baris terakhir dari sel tanggal untuk cari angka tanggalnya
+          // (biar tetap kebaca walau sel tanggal juga sempat ditumpuk multi-baris).
+          const dateLines = splitCellTitles(rawDateCell);
+          const lastLine = dateLines[dateLines.length - 1] || '';
+          const m = lastLine.match(/(\d{1,2})\s*$/);
           if (!m) {
             days.push(null);
             continue;
           }
-          days.push({ dayNum: parseInt(m[1], 10), title: String(titleRow[col] || '').trim() });
+          const dayNum = parseInt(m[1], 10);
+          // Sisa teks di baris terakhir (sebelum angka tanggal) — kalau ada,
+          // dihitung sebagai 1 brief tambahan dari data lama yang belum dirapikan.
+          const leftoverOnDateLine = lastLine.replace(/(\d{1,2})\s*$/, '').trim();
+          const titlesFromDateRow = [...dateLines.slice(0, -1), leftoverOnDateLine].filter(Boolean);
+          const titlesFromTitleRow = splitCellTitles(titleRow[col]);
+          const titles = [...titlesFromDateRow, ...titlesFromTitleRow];
+          days.push({ dayNum, titles });
         }
         weeks.push(days);
         cursor += 2;
@@ -276,23 +297,25 @@ function blocksToImportRows(blocks, blockMonths, existingBriefs = []) {
     const my = blockMonths[bIdx] || '';
     block.weeks.forEach((week) => {
       week.forEach((cell) => {
-        if (!cell || !cell.title) return;
+        if (!cell || !cell.titles || cell.titles.length === 0) return;
         let tglPosting = '';
         if (my) {
           const [y, m] = my.split('-');
           tglPosting = `${y}-${m}-${String(cell.dayNum).padStart(2, '0')}`;
         }
-        const alreadyExists = existingSet.has((cell.title || '').trim().toLowerCase());
-        rows.push({
-          id: `imp-${rid++}`,
-          blockIdx: bIdx,
-          dayNum: cell.dayNum,
-          title: cell.title,
-          tglPosting,
-          include: !alreadyExists,
-          alreadyExists,
-          pilar: 'Lainnya',
-          platform: [],
+        cell.titles.forEach((title) => {
+          const alreadyExists = existingSet.has(title.trim().toLowerCase());
+          rows.push({
+            id: `imp-${rid++}`,
+            blockIdx: bIdx,
+            dayNum: cell.dayNum,
+            title,
+            tglPosting,
+            include: !alreadyExists,
+            alreadyExists,
+            pilar: 'Lainnya',
+            platform: [],
+          });
         });
       });
     });
