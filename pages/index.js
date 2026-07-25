@@ -261,15 +261,6 @@ function splitCellTitles(raw) {
   return merged;
 }
 
-// Tebak platform dari label blok (baris judul tab di atas header Senin..Minggu,
-// mis. "IG JUL" atau "TIKTOK JUL"). Kosong kalau tidak match apa-apa (biar user isi manual).
-function guessPlatformFromLabel(label) {
-  const l = String(label || '').toLowerCase();
-  if (/\btiktok\b|\btt\b/.test(l)) return 'Tiktok';
-  if (/\big\b|instagram/.test(l)) return 'Instagram';
-  return '';
-}
-
 function detectContentPlanBlocks(grid) {
   const blocks = [];
   let i = 0;
@@ -277,19 +268,9 @@ function detectContentPlanBlocks(grid) {
     const row = (grid[i] || []).slice(0, 7).map((c) => String(c || '').trim().toLowerCase());
     const isHeader = CSV_DAY_HEADERS.every((d, idx) => row[idx] === d);
     if (isHeader) {
-      // Cari label tab di baris-baris terdekat di atas header "Senin..Minggu"
-      // (mis. "IG JUL" / "TIKTOK JUL"), dipakai untuk menebak platform otomatis.
-      // Nggak cuma cek 1 baris tepat di atasnya — kadang ada baris kosong
-      // pemisah, jadi kita cari sampai 4 baris ke atas.
-      let label = '';
-      for (let offset = 1; offset <= 4; offset++) {
-        const candidateRow = grid[i - offset] || [];
-        const text = candidateRow.map((c) => String(c || '').trim()).filter(Boolean).join(' ');
-        if (text) {
-          label = text;
-          break;
-        }
-      }
+      // Catatan: nama Table Google Sheets (mis. "IG JUL") TIDAK ikut ter-export
+      // ke CSV sama sekali — itu metadata Table, bukan isi sel. Jadi platform
+      // nggak bisa ditebak otomatis dari file CSV, harus dipilih manual per blok.
       const weeks = [];
       let cursor = i + 1;
       while (cursor + 1 < grid.length) {
@@ -327,7 +308,7 @@ function detectContentPlanBlocks(grid) {
         weeks.push(days);
         cursor += 2;
       }
-      blocks.push({ headerRow: i, label, platform: guessPlatformFromLabel(label), weeks });
+      blocks.push({ headerRow: i, weeks });
       i = cursor > i ? cursor : i + 1;
     } else {
       i++;
@@ -336,7 +317,7 @@ function detectContentPlanBlocks(grid) {
   return blocks;
 }
 
-function blocksToImportRows(blocks, blockMonths, existingBriefs = []) {
+function blocksToImportRows(blocks, blockMonths, existingBriefs = [], blockPlatforms = []) {
   const existingSet = new Set(existingBriefs.map((b) => (b.brief || '').trim().toLowerCase()));
   const rows = [];
   let rid = 0;
@@ -363,7 +344,7 @@ function blocksToImportRows(blocks, blockMonths, existingBriefs = []) {
             // Brief yang nempel di baris tanggal (mis. "UKV Periksa Visa Dulu (o) 8") -> Story.
             // Brief di baris judul utama -> Video. Bisa diubah manual di form sebelum import.
             pilar: source === 'date' ? 'Story' : 'Video',
-            platform: block.platform ? [block.platform] : [],
+            platform: blockPlatforms[bIdx] ? [blockPlatforms[bIdx]] : [],
           });
         });
       });
@@ -756,6 +737,24 @@ export default function Home() {
   const [importProgress, setImportProgress] = useState('');
   const [importAsReference, setImportAsReference] = useState(true);
   const [showDateSummary, setShowDateSummary] = useState(false);
+  const [importBlockPlatforms, setImportBlockPlatforms] = useState([]);
+
+  function applyImportRows(blocks, months, blockPlatforms) {
+    setImportRows(blocksToImportRows(blocks, months, briefs, blockPlatforms));
+  }
+
+  function updateBlockPlatform(bIdx, value) {
+    const platforms = importBlockPlatforms.slice();
+    platforms[bIdx] = value;
+    setImportBlockPlatforms(platforms);
+    applyImportRows(importBlocks, importBlockMonths, platforms);
+  }
+
+  function applyPlatformToAllBlocks(value) {
+    const platforms = importBlocks.map(() => value);
+    setImportBlockPlatforms(platforms);
+    applyImportRows(importBlocks, importBlockMonths, platforms);
+  }
 
   function handleImportFileChange(e) {
     const file = e.target.files && e.target.files[0];
@@ -771,9 +770,11 @@ export default function Home() {
           return;
         }
         const months = blocks.map(() => '');
+        const platforms = blocks.map(() => '');
         setImportBlocks(blocks);
         setImportBlockMonths(months);
-        setImportRows(blocksToImportRows(blocks, months, briefs));
+        setImportBlockPlatforms(platforms);
+        setImportRows(blocksToImportRows(blocks, months, briefs, platforms));
         setImportMsg('');
         setImportAsReference(true);
         setImportOpen(true);
@@ -788,7 +789,7 @@ export default function Home() {
     const months = importBlockMonths.slice();
     months[bIdx] = value;
     setImportBlockMonths(months);
-    setImportRows(blocksToImportRows(importBlocks, months, briefs));
+    applyImportRows(importBlocks, months, importBlockPlatforms);
   }
 
   function updateImportRow(id, patch) {
@@ -1475,18 +1476,43 @@ export default function Home() {
               </label>
             </div>
 
+            <p className="import-hint" style={{ marginTop: 0 }}>
+              File CSV nggak nyimpen nama Table (mis. "IG JUL") — itu metadata Google Sheets yang hilang saat
+              export CSV. Pilih platform manual untuk tiap blok di bawah ini.
+            </p>
+            <div className="import-quickfill">
+              <span>Terapkan ke semua blok:</span>
+              {PLATFORMS.map((p) => (
+                <button key={p} type="button" className="btn btn-outline btn-sm" onClick={() => applyPlatformToAllBlocks(p)}>
+                  {p}
+                </button>
+              ))}
+            </div>
+
             <div className="import-blocks">
               {importBlocks.map((block, bIdx) => (
-                <div className="import-block" key={bIdx}>
-                  <span>
-                    Blok {bIdx + 1} ({block.weeks.length} minggu){block.label ? ` — "${block.label}"` : ''}
-                    {block.platform ? ` → ${block.platform}` : ' → platform tidak terdeteksi, isi manual per baris'}
-                  </span>
-                  <input
-                    type="month"
-                    value={importBlockMonths[bIdx] || ''}
-                    onChange={(e) => updateBlockMonth(bIdx, e.target.value)}
-                  />
+                <div className="import-block import-block-col" key={bIdx}>
+                  <div className="import-block-row">
+                    <span>Blok {bIdx + 1} ({block.weeks.length} minggu)</span>
+                    <input
+                      type="month"
+                      value={importBlockMonths[bIdx] || ''}
+                      onChange={(e) => updateBlockMonth(bIdx, e.target.value)}
+                    />
+                  </div>
+                  <div className="checkbox-row">
+                    {PLATFORMS.map((p) => (
+                      <label key={p} className="checkbox-chip checkbox-chip-sm">
+                        <input
+                          type="radio"
+                          name={`blockPlatform-${bIdx}`}
+                          checked={importBlockPlatforms[bIdx] === p}
+                          onChange={() => updateBlockPlatform(bIdx, p)}
+                        />
+                        {p}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
