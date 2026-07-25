@@ -277,10 +277,19 @@ function detectContentPlanBlocks(grid) {
     const row = (grid[i] || []).slice(0, 7).map((c) => String(c || '').trim().toLowerCase());
     const isHeader = CSV_DAY_HEADERS.every((d, idx) => row[idx] === d);
     if (isHeader) {
-      // Baris tepat di atas header "Senin..Minggu" biasanya berisi label tab,
-      // mis. "IG JUL" / "TIKTOK JUL" — dipakai untuk menebak platform otomatis.
-      const labelRow = grid[i - 1] || [];
-      const label = labelRow.map((c) => String(c || '').trim()).filter(Boolean).join(' ');
+      // Cari label tab di baris-baris terdekat di atas header "Senin..Minggu"
+      // (mis. "IG JUL" / "TIKTOK JUL"), dipakai untuk menebak platform otomatis.
+      // Nggak cuma cek 1 baris tepat di atasnya — kadang ada baris kosong
+      // pemisah, jadi kita cari sampai 4 baris ke atas.
+      let label = '';
+      for (let offset = 1; offset <= 4; offset++) {
+        const candidateRow = grid[i - offset] || [];
+        const text = candidateRow.map((c) => String(c || '').trim()).filter(Boolean).join(' ');
+        if (text) {
+          label = text;
+          break;
+        }
+      }
       const weeks = [];
       let cursor = i + 1;
       while (cursor + 1 < grid.length) {
@@ -1468,7 +1477,10 @@ export default function Home() {
             <div className="import-blocks">
               {importBlocks.map((block, bIdx) => (
                 <div className="import-block" key={bIdx}>
-                  <span>Blok {bIdx + 1} ({block.weeks.length} minggu)</span>
+                  <span>
+                    Blok {bIdx + 1} ({block.weeks.length} minggu){block.label ? ` — "${block.label}"` : ''}
+                    {block.platform ? ` → ${block.platform}` : ' → platform tidak terdeteksi, isi manual per baris'}
+                  </span>
                   <input
                     type="month"
                     value={importBlockMonths[bIdx] || ''}
