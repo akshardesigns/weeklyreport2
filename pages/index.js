@@ -364,6 +364,20 @@ function parseWorkbookToAllBlocks(wb) {
   return allBlocks;
 }
 
+function parseHeaderName(str) {
+  const s = String(str || '').trim();
+  if (!s) return { platform: '', label: '' };
+  const lower = s.toLowerCase();
+
+  if (/^(ig|instagram)\b/i.test(s) || lower.startsWith('ig ') || lower === 'ig' || lower.includes('instagram')) {
+    return { platform: 'Instagram', label: s };
+  }
+  if (/^(tiktok|tok)\b/i.test(s) || lower.startsWith('tok ') || lower === 'tok' || lower.includes('tiktok')) {
+    return { platform: 'Tiktok', label: s };
+  }
+  return { platform: '', label: s };
+}
+
 function detectContentPlanBlocks(grid, sheetName = '') {
   const blocks = [];
   let i = 0;
@@ -372,23 +386,23 @@ function detectContentPlanBlocks(grid, sheetName = '') {
     const isHeader = CSV_DAY_HEADERS.every((d, idx) => row[idx] === d);
     if (isHeader) {
       let platformName = '';
+      let headerLabel = '';
       let detectedMonth = detectMonthYearFromText(sheetName);
 
       for (let r = Math.max(0, i - 5); r < i; r++) {
-        const str = (grid[r] || [])
-          .map((c) => String(c.val !== undefined ? c.val : c || ''))
-          .join(' ');
-        const strLower = str.toLowerCase();
-        if (!platformName) {
-          if (strLower.includes('tiktok') || strLower.includes('tok')) {
-            platformName = 'Tiktok';
-          } else if (strLower.includes('ig') || strLower.includes('instagram')) {
-            platformName = 'Instagram';
+        const rowCells = grid[r] || [];
+        for (let c = 0; c < rowCells.length; c++) {
+          const val = String(rowCells[c] && rowCells[c].val !== undefined ? rowCells[c].val : rowCells[c] || '').trim();
+          if (!val) continue;
+          const parsed = parseHeaderName(val);
+          if (parsed.platform && !platformName) {
+            platformName = parsed.platform;
+            headerLabel = parsed.label;
           }
-        }
-        if (!detectedMonth) {
-          const m = detectMonthYearFromText(str);
-          if (m) detectedMonth = m;
+          if (!detectedMonth) {
+            const m = detectMonthYearFromText(val);
+            if (m) detectedMonth = m;
+          }
         }
       }
 
@@ -433,7 +447,7 @@ function detectContentPlanBlocks(grid, sheetName = '') {
         weeks.push(days);
         cursor += 2;
       }
-      blocks.push({ headerRow: i, platformName, detectedMonth, weeks });
+      blocks.push({ headerRow: i, platformName, headerLabel, detectedMonth, weeks });
       i = cursor > i ? cursor : i + 1;
     } else {
       i++;
@@ -1696,8 +1710,9 @@ export default function Home() {
                     <div className="import-block-row">
                       <span>
                         <b style={{ color: 'var(--ink)' }}>Blok {bIdx + 1}</b>
+                        {block.headerLabel ? <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>— Header: "{block.headerLabel}"</span> : null}
                         {block.sheetName ? <span style={{ marginLeft: 6, fontSize: 12, opacity: 0.75 }}>(Sheet "{block.sheetName}")</span> : null}
-                        {block.platformName ? <span style={{ marginLeft: 6, fontSize: 12, color: '#0071e3', fontWeight: 500 }}> — {block.platformName}</span> : null}
+                        {block.platformName ? <span style={{ marginLeft: 6, fontSize: 12, color: '#0071e3', fontWeight: 600 }}> → {block.platformName}</span> : null}
                       </span>
                       <input
                         type="month"
