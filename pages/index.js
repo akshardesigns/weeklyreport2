@@ -944,18 +944,14 @@ export default function Home() {
                         <div
                           key={`${b.id}-${it.platform}-${idx}`}
                           className={`calendar-item${isRef ? ' is-reference' : ''}`}
-                          style={{
-                            background: isRef ? '#f4f4f6' : style.bg,
-                            borderLeftColor: isRef ? '#8e8e93' : style.border,
-                            ...(isRef ? { borderLeftWidth: '3px', opacity: 0.88 } : {}),
-                          }}
+                          style={{ background: style.bg, borderLeftColor: style.border }}
                           onClick={(e) => {
                             e.stopPropagation();
                             enterEditMode(b.id);
                           }}
                           title={`${isRef ? '[Transisi/Referensi] ' : ''}${it.platform || platformLabel(b)} · ${pilarDisplayLabel(it.platform, b.pilar)} · ${b.brief} — ${statusOf(b)}`}
                         >
-                          <span className="calendar-item-badge" style={{ background: isRef ? '#6e6e73' : badgeColor }}>
+                          <span className="calendar-item-badge" style={{ background: badgeColor }}>
                             {isRef ? '📌 ' : ''}{label} · {pilarDisplayLabel(it.platform, b.pilar)}
                           </span>
                           <div className="calendar-item-title">{b.brief}</div>
