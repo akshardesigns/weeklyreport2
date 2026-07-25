@@ -243,11 +243,22 @@ function parseCsvToGrid(text) {
 // Pecah isi 1 sel jadi beberapa judul brief terpisah. Satu sel bisa berisi lebih
 // dari 1 brief kalau user menekan Enter/Alt+Enter di dalam sel yang sama di Sheets
 // (jadi ada line break literal di dalam cell saat diexport ke CSV).
+// Perhatian: baris lanjutan yang diawali tanda kurung, mis. "(AUDIO DI POV CUSTOMER)",
+// dianggap keterangan/anotasi dari judul di atasnya (bukan brief baru) dan digabung balik.
 function splitCellTitles(raw) {
-  return String(raw || '')
+  const lines = String(raw || '')
     .split(/\r\n|\r|\n/)
     .map((s) => s.trim())
     .filter(Boolean);
+  const merged = [];
+  lines.forEach((line) => {
+    if (line.startsWith('(') && merged.length > 0) {
+      merged[merged.length - 1] += ' ' + line;
+    } else {
+      merged.push(line);
+    }
+  });
+  return merged;
 }
 
 // Tebak platform dari label blok (baris judul tab di atas header Senin..Minggu,
