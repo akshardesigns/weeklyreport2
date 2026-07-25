@@ -335,6 +335,22 @@ function parseSheetToGrid(sheet) {
   return grid;
 }
 
+function splitCellTitles(raw) {
+  const lines = String(raw || '')
+    .split(/\r\n|\r|\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const merged = [];
+  lines.forEach((line) => {
+    if (line.startsWith('(') && merged.length > 0) {
+      merged[merged.length - 1] += ' ' + line;
+    } else {
+      merged.push(line);
+    }
+  });
+  return merged;
+}
+
 function parseWorkbookToAllBlocks(wb) {
   const allBlocks = [];
   (wb.SheetNames || []).forEach((sheetName) => {
