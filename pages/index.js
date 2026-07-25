@@ -389,7 +389,7 @@ function detectContentPlanBlocks(grid, sheetName = '') {
       let headerLabel = '';
       let detectedMonth = detectMonthYearFromText(sheetName);
 
-      for (let r = Math.max(0, i - 5); r < i; r++) {
+      for (let r = 0; r < i; r++) {
         const rowCells = grid[r] || [];
         for (let c = 0; c < rowCells.length; c++) {
           const val = String(rowCells[c] && rowCells[c].val !== undefined ? rowCells[c].val : rowCells[c] || '').trim();
@@ -977,7 +977,12 @@ export default function Home() {
           return;
         }
         const months = blocks.map((b) => b.detectedMonth || '');
-        const platforms = blocks.map((b) => b.platformName || '');
+        const platforms = blocks.map((b, idx) => {
+          if (b.platformName) return b.platformName;
+          const sheetBlocks = blocks.filter((x) => x.sheetName === b.sheetName);
+          const blockInSheetIdx = sheetBlocks.indexOf(b);
+          return blockInSheetIdx % 2 === 0 ? 'Instagram' : 'Tiktok';
+        });
         setImportBlocks(blocks);
         setImportBlockMonths(months);
         setImportBlockPlatforms(platforms);
