@@ -876,12 +876,8 @@ export default function Home() {
         const platforms = blocks.map(() => '');
         setImportBlocks(blocks);
         setImportBlockMonths(months);
-<<<<<<< HEAD
         setImportBlockPlatforms(platforms);
         setImportRows(blocksToImportRows(blocks, months, briefs, platforms));
-=======
-        setImportRows(blocksToImportRows(blocks, months, briefs));
->>>>>>> 0807b5f (feat: parse xlsx calendar import with cell color detection for story and video pillars)
         setImportMsg('');
         setImportAsReference(true);
         setImportOpen(true);
@@ -896,11 +892,7 @@ export default function Home() {
     const months = importBlockMonths.slice();
     months[bIdx] = value;
     setImportBlockMonths(months);
-<<<<<<< HEAD
     applyImportRows(importBlocks, months, importBlockPlatforms);
-=======
-    setImportRows(blocksToImportRows(importBlocks, months, briefs));
->>>>>>> 0807b5f (feat: parse xlsx calendar import with cell color detection for story and video pillars)
   }
 
   function updateImportRow(id, patch) {
@@ -1602,10 +1594,11 @@ export default function Home() {
 
             <div className="import-blocks">
               {importBlocks.map((block, bIdx) => (
-<<<<<<< HEAD
                 <div className="import-block import-block-col" key={bIdx}>
                   <div className="import-block-row">
-                    <span>Blok {bIdx + 1} ({block.weeks.length} minggu)</span>
+                    <span>
+                      Blok {bIdx + 1}{block.platformName ? ` — ${block.platformName}` : ''} ({block.weeks.length} minggu)
+                    </span>
                     <input
                       type="month"
                       value={importBlockMonths[bIdx] || ''}
@@ -1625,15 +1618,6 @@ export default function Home() {
                       </label>
                     ))}
                   </div>
-=======
-                <div className="import-block" key={bIdx}>
-                  <span>Blok {bIdx + 1}{block.platformName ? ` — ${block.platformName}` : ''} ({block.weeks.length} minggu)</span>
-                  <input
-                    type="month"
-                    value={importBlockMonths[bIdx] || ''}
-                    onChange={(e) => updateBlockMonth(bIdx, e.target.value)}
-                  />
->>>>>>> 0807b5f (feat: parse xlsx calendar import with cell color detection for story and video pillars)
                 </div>
               ))}
             </div>
