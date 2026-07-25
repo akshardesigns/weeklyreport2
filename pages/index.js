@@ -1482,6 +1482,29 @@ export default function Home() {
               ))}
             </div>
 
+            {importRows.length > 0 && (() => {
+              const missingRows = importRows.filter((r) => !r.alreadyExists);
+              return missingRows.length === 0 ? (
+                <div className="import-verdict import-verdict-ok">
+                  ✅ Semua {importRows.length} brief di CSV ini sudah cocok dengan Kalender Konten (Google Sheets) kamu.
+                </div>
+              ) : (
+                <div className="import-verdict import-verdict-warn">
+                  <p>
+                    ⚠️ Ada {missingRows.length} dari {importRows.length} brief di CSV yang belum ketemu di Kalender
+                    Konten (Google Sheets) kamu:
+                  </p>
+                  <ul>
+                    {missingRows.map((r) => (
+                      <li key={r.id}>
+                        <b>{r.tglPosting || '(tanggal belum dipilih)'}</b> — {r.title}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
+
             <div className="import-rows">
               {importRows.length === 0 ? (
                 <div className="empty">Tidak ada judul konten yang terbaca dari file ini.</div>
