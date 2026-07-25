@@ -755,6 +755,7 @@ export default function Home() {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState('');
   const [importAsReference, setImportAsReference] = useState(true);
+  const [showDateSummary, setShowDateSummary] = useState(false);
 
   function handleImportFileChange(e) {
     const file = e.target.files && e.target.files[0];
@@ -1509,6 +1510,32 @@ export default function Home() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              );
+            })()}
+
+            {importRows.length > 0 && (() => {
+              const counts = {};
+              importRows.forEach((r) => {
+                const d = r.tglPosting || '(tanggal belum dipilih)';
+                counts[d] = (counts[d] || 0) + 1;
+              });
+              const dateSummary = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
+              return (
+                <div className="import-date-summary">
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowDateSummary((v) => !v)}>
+                    {showDateSummary ? 'Sembunyikan' : 'Lihat'} Ringkasan Jumlah Brief per Tanggal (semua platform)
+                  </button>
+                  {showDateSummary && (
+                    <ul className="import-date-summary-list">
+                      {dateSummary.map(([date, count]) => (
+                        <li key={date}>
+                          <span>{date}</span>
+                          <b>{count} brief</b>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               );
             })()}
