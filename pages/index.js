@@ -506,6 +506,22 @@ function blocksToImportRows(blocks, blockMonths, existingBriefs = [], blockPlatf
   return Array.from(rowMap.values());
 }
 
+function getBlockPreviewTitles(block) {
+  const titles = [];
+  (block.weeks || []).forEach((week) => {
+    (week || []).forEach((day) => {
+      if (day && day.titles) {
+        day.titles.forEach((t) => {
+          if (t.text && titles.length < 2) {
+            titles.push(t.text);
+          }
+        });
+      }
+    });
+  });
+  return titles.join(', ');
+}
+
 export default function Home() {
   const [briefs, setBriefs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1673,33 +1689,46 @@ export default function Home() {
             </div>
 
             <div className="import-blocks">
-              {importBlocks.map((block, bIdx) => (
-                <div className="import-block import-block-col" key={bIdx}>
-                  <div className="import-block-row">
-                    <span>
-                      Blok {bIdx + 1}{block.platformName ? ` — ${block.platformName}` : ''} ({block.weeks.length} minggu)
-                    </span>
-                    <input
-                      type="month"
-                      value={importBlockMonths[bIdx] || ''}
-                      onChange={(e) => updateBlockMonth(bIdx, e.target.value)}
-                    />
+              {importBlocks.map((block, bIdx) => {
+                const sample = getBlockPreviewTitles(block);
+                return (
+                  <div className="import-block import-block-col" key={bIdx}>
+                    <div className="import-block-row">
+                      <span>
+                        <b style={{ color: 'var(--ink)' }}>Blok {bIdx + 1}</b>
+                        {block.sheetName ? <span style={{ marginLeft: 6, fontSize: 12, opacity: 0.75 }}>(Sheet "{block.sheetName}")</span> : null}
+                        {block.platformName ? <span style={{ marginLeft: 6, fontSize: 12, color: '#0071e3', fontWeight: 500 }}> — {block.platformName}</span> : null}
+                      </span>
+                      <input
+                        type="month"
+                        value={importBlockMonths[bIdx] || ''}
+                        onChange={(e) => updateBlockMonth(bIdx, e.target.value)}
+                      />
+                    </div>
+
+                    {sample && (
+                      <div style={{ fontSize: 11.5, color: 'var(--sub)', background: 'rgba(0,0,0,0.03)', padding: '4px 8px', borderRadius: 6, width: '100%' }}>
+                        📝 <i>{sample}...</i>
+                      </div>
+                    )}
+
+                    <div className="checkbox-row" style={{ marginTop: 2 }}>
+                      <span style={{ fontSize: 12, opacity: 0.8 }}>Platform:</span>
+                      {PLATFORMS.map((p) => (
+                        <label key={p} className="checkbox-chip checkbox-chip-sm">
+                          <input
+                            type="radio"
+                            name={`blockPlatform-${bIdx}`}
+                            checked={importBlockPlatforms[bIdx] === p}
+                            onChange={() => updateBlockPlatform(bIdx, p)}
+                          />
+                          {p}
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                  <div className="checkbox-row">
-                    {PLATFORMS.map((p) => (
-                      <label key={p} className="checkbox-chip checkbox-chip-sm">
-                        <input
-                          type="radio"
-                          name={`blockPlatform-${bIdx}`}
-                          checked={importBlockPlatforms[bIdx] === p}
-                          onChange={() => updateBlockPlatform(bIdx, p)}
-                        />
-                        {p}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {importRows.length > 0 && (() => {
