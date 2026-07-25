@@ -228,16 +228,73 @@ function todayISO() {
   return toISO(new Date());
 }
 
-// --- Helper Import CSV (transisi dari sheet kalender manual lama) ---
-// Format sumbernya: grid mingguan (header Senin..Minggu), lalu baris angka tanggal,
-// lalu baris judul konten, berulang per minggu. Ini best-effort karena formatnya
-// ditulis manual (kadang ada anotasi nama nempel di angka tanggal, mis. "thomas3").
+// --- Helper Import XLSX/CSV (transisi dari sheet kalender manual lama) ---
 const CSV_DAY_HEADERS = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
 
-function parseCsvToGrid(text) {
-  const wb = XLSX.read(text, { type: 'string' });
+function isCellRed(cell) {
+  if (!cell || !cell.s) return false;
+  const s = cell.s;
+  const colorsToCheck = [];
+  if (s.fgColor) colorsToCheck.push(s.fgColor);
+  if (s.bgColor) colorsToCheck.push(s.bgColor);
+  if (s.fill) {
+    if (s.fill.fgColor) colorsToCheck.push(s.fill.fgColor);
+    if (s.fill.bgColor) colorsToCheck.push(s.fill.bgColor);
+  }
+  for (const c of colorsToCheck) {
+    if (!c) continue;
+    let rgb = String(c.rgb || c.theme || '').toUpperCase();
+    if (rgb.length > 6 && rgb.startsWith('FF')) {
+      rgb = rgb.slice(2);
+    }
+    if (
+      [
+        'FF0000',
+        'E60000',
+        'CC0000',
+        'FF4D4D',
+        'FF3B30',
+        'EA4335',
+        'D93025',
+        'F44336',
+        'E53935',
+        'D32F2F',
+        'C62828',
+        'B71C1C',
+        'RED',
+      ].includes(rgb)
+    ) {
+      return true;
+    }
+    if (/^[0-9A-F]{6}$/.test(rgb)) {
+      const r = parseInt(rgb.substring(0, 2), 16);
+      const g = parseInt(rgb.substring(2, 4), 16);
+      const b = parseInt(rgb.substring(4, 6), 16);
+      if (r > 180 && g < 100 && b < 100) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function parseWorkbookToGrid(wb) {
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  if (!sheet || !sheet['!ref']) return [];
+  const range = XLSX.utils.decode_range(sheet['!ref']);
+  const grid = [];
+  for (let R = range.s.r; R <= range.e.r; ++R) {
+    const row = [];
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = sheet[cellAddress];
+      const val = cell ? String(cell.v !== undefined ? cell.v : cell.w !== undefined ? cell.w : '').trim() : '';
+      const red = cell ? isCellRed(cell) : false;
+      row.push({ val, isRed: red });
+    }
+    grid.push(row);
+  }
+  return grid;
 }
 
 // Pecah isi 1 sel jadi beberapa judul brief terpisah. Satu sel bisa berisi lebih
@@ -265,26 +322,41 @@ function detectContentPlanBlocks(grid) {
   const blocks = [];
   let i = 0;
   while (i < grid.length) {
-    const row = (grid[i] || []).slice(0, 7).map((c) => String(c || '').trim().toLowerCase());
+    const row = (grid[i] || []).slice(0, 7).map((c) => String(c.val !== undefined ? c.val : c || '').trim().toLowerCase());
     const isHeader = CSV_DAY_HEADERS.every((d, idx) => row[idx] === d);
     if (isHeader) {
-      // Catatan: nama Table Google Sheets (mis. "IG JUL") TIDAK ikut ter-export
-      // ke CSV sama sekali — itu metadata Table, bukan isi sel. Jadi platform
-      // nggak bisa ditebak otomatis dari file CSV, harus dipilih manual per blok.
+      let platformName = '';
+      for (let r = Math.max(0, i - 5); r < i; r++) {
+        const str = (grid[r] || [])
+          .map((c) => String(c.val !== undefined ? c.val : c || ''))
+          .join(' ')
+          .toLowerCase();
+        if (str.includes('tiktok') || str.includes('tok')) {
+          platformName = 'Tiktok';
+          break;
+        } else if (str.includes('ig') || str.includes('instagram')) {
+          platformName = 'Instagram';
+          break;
+        }
+      }
+
       const weeks = [];
       let cursor = i + 1;
       while (cursor + 1 < grid.length) {
         const dateRow = grid[cursor] || [];
         const hasDateLike = dateRow
           .slice(0, 7)
-          .some((c) => /\d{1,2}\s*$/.test(String(c || '').trim()) && String(c || '').trim() !== '');
+          .some((c) => {
+            const txt = String(c.val !== undefined ? c.val : c || '').trim();
+            return /\d{1,2}\s*$/.test(txt) && txt !== '';
+          });
         if (!hasDateLike) break;
         const titleRow = grid[cursor + 1] || [];
         const days = [];
         for (let col = 0; col < 7; col++) {
-          const rawDateCell = String(dateRow[col] || '');
-          // Ambil baris terakhir dari sel tanggal untuk cari angka tanggalnya
-          // (biar tetap kebaca walau sel tanggal juga sempat ditumpuk multi-baris).
+          const dateCell = dateRow[col];
+          const titleCell = titleRow[col];
+          const rawDateCell = String(dateCell && dateCell.val !== undefined ? dateCell.val : dateCell || '').trim();
           const dateLines = splitCellTitles(rawDateCell);
           const lastLine = dateLines[dateLines.length - 1] || '';
           const m = lastLine.match(/(\d{1,2})\s*$/);
@@ -293,22 +365,23 @@ function detectContentPlanBlocks(grid) {
             continue;
           }
           const dayNum = parseInt(m[1], 10);
-          // Sisa teks di baris terakhir (sebelum angka tanggal) — kalau ada,
-          // dihitung sebagai 1 brief tambahan dari data lama yang belum dirapikan.
-          // source: 'date' = brief singkat yang nempel di baris tanggal -> pilar Story.
           const leftoverOnDateLine = lastLine.replace(/(\d{1,2})\s*$/, '').trim();
           const titlesFromDateRow = [...dateLines.slice(0, -1), leftoverOnDateLine]
             .filter(Boolean)
             .map((text) => ({ text, source: 'date' }));
-          // source: 'title' = brief utama di baris judul -> pilar Video.
-          const titlesFromTitleRow = splitCellTitles(titleRow[col]).map((text) => ({ text, source: 'title' }));
+          
+          const rawTitleCell = String(titleCell && titleCell.val !== undefined ? titleCell.val : titleCell || '').trim();
+          const titlesFromTitleRow = splitCellTitles(rawTitleCell).map((text) => ({ text, source: 'title' }));
+          
           const titles = [...titlesFromDateRow, ...titlesFromTitleRow];
-          days.push({ dayNum, titles });
+          const isRed = (titleCell && titleCell.isRed) || (dateCell && dateCell.isRed);
+
+          days.push({ dayNum, titles, isRed });
         }
         weeks.push(days);
         cursor += 2;
       }
-      blocks.push({ headerRow: i, weeks });
+      blocks.push({ headerRow: i, platformName, weeks });
       i = cursor > i ? cursor : i + 1;
     } else {
       i++;
@@ -319,10 +392,16 @@ function detectContentPlanBlocks(grid) {
 
 function blocksToImportRows(blocks, blockMonths, existingBriefs = [], blockPlatforms = []) {
   const existingSet = new Set(existingBriefs.map((b) => (b.brief || '').trim().toLowerCase()));
-  const rows = [];
+  const rowMap = new Map();
   let rid = 0;
+
   blocks.forEach((block, bIdx) => {
     const my = blockMonths[bIdx] || '';
+    const platformChoice = blockPlatforms[bIdx] || block.platformName || 'Instagram';
+    const defaultPlatform = [platformChoice];
+    const isIG = platformChoice === 'Instagram';
+    const isTikTok = platformChoice === 'Tiktok';
+
     block.weeks.forEach((week) => {
       week.forEach((cell) => {
         if (!cell || !cell.titles || cell.titles.length === 0) return;
@@ -331,26 +410,48 @@ function blocksToImportRows(blocks, blockMonths, existingBriefs = [], blockPlatf
           const [y, m] = my.split('-');
           tglPosting = `${y}-${m}-${String(cell.dayNum).padStart(2, '0')}`;
         }
+
         cell.titles.forEach(({ text: title, source }) => {
-          const alreadyExists = existingSet.has(title.trim().toLowerCase());
-          rows.push({
-            id: `imp-${rid++}`,
-            blockIdx: bIdx,
-            dayNum: cell.dayNum,
-            title,
-            tglPosting,
-            include: !alreadyExists,
-            alreadyExists,
-            // Brief yang nempel di baris tanggal (mis. "UKV Periksa Visa Dulu (o) 8") -> Story.
-            // Brief di baris judul utama -> Video. Bisa diubah manual di form sebelum import.
-            pilar: source === 'date' ? 'Story' : 'Video',
-            platform: blockPlatforms[bIdx] ? [blockPlatforms[bIdx]] : [],
-          });
+          if (!title) return;
+          const normTitle = title.trim().toLowerCase();
+          const key = `${normTitle}_${tglPosting}`;
+
+          let defaultPilar = 'Video';
+          if (isIG) {
+            defaultPilar = cell.isRed || source === 'date' ? 'Story' : 'Video';
+          } else if (isTikTok) {
+            defaultPilar = 'Video';
+          } else {
+            defaultPilar = cell.isRed || source === 'date' ? 'Story' : 'Video';
+          }
+
+          if (rowMap.has(key)) {
+            const existing = rowMap.get(key);
+            defaultPlatform.forEach((p) => {
+              if (!existing.platform.includes(p)) {
+                existing.platform.push(p);
+              }
+            });
+          } else {
+            const alreadyExists = existingSet.has(normTitle);
+            rowMap.set(key, {
+              id: `imp-${rid++}`,
+              blockIdx: bIdx,
+              dayNum: cell.dayNum,
+              title,
+              tglPosting,
+              include: !alreadyExists,
+              alreadyExists,
+              pilar: defaultPilar,
+              platform: [...defaultPlatform],
+            });
+          }
         });
       });
     });
   });
-  return rows;
+
+  return Array.from(rowMap.values());
 }
 
 export default function Home() {
@@ -761,9 +862,11 @@ export default function Home() {
     e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = (evt) => {
       try {
-        const grid = parseCsvToGrid(String(reader.result));
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, { type: 'array', cellStyles: true });
+        const grid = parseWorkbookToGrid(wb);
         const blocks = detectContentPlanBlocks(grid);
         if (blocks.length === 0) {
           setImportMsg('Tidak menemukan pola grid kalender (header Senin–Minggu) di file ini.');
@@ -773,23 +876,31 @@ export default function Home() {
         const platforms = blocks.map(() => '');
         setImportBlocks(blocks);
         setImportBlockMonths(months);
+<<<<<<< HEAD
         setImportBlockPlatforms(platforms);
         setImportRows(blocksToImportRows(blocks, months, briefs, platforms));
+=======
+        setImportRows(blocksToImportRows(blocks, months, briefs));
+>>>>>>> 0807b5f (feat: parse xlsx calendar import with cell color detection for story and video pillars)
         setImportMsg('');
         setImportAsReference(true);
         setImportOpen(true);
       } catch (err) {
-        setImportMsg('Gagal membaca file CSV: ' + err.message);
+        setImportMsg('Gagal membaca file Excel/CSV: ' + err.message);
       }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   }
 
   function updateBlockMonth(bIdx, value) {
     const months = importBlockMonths.slice();
     months[bIdx] = value;
     setImportBlockMonths(months);
+<<<<<<< HEAD
     applyImportRows(importBlocks, months, importBlockPlatforms);
+=======
+    setImportRows(blocksToImportRows(importBlocks, months, briefs));
+>>>>>>> 0807b5f (feat: parse xlsx calendar import with cell color detection for story and video pillars)
   }
 
   function updateImportRow(id, patch) {
@@ -917,11 +1028,11 @@ export default function Home() {
               Bulan Ini
             </button>
             <button className="btn btn-outline btn-sm" onClick={() => importFileRef.current?.click()}>
-              Import CSV
+              Import XLSX / CSV
             </button>
             <input
               type="file"
-              accept=".csv"
+              accept=".xlsx, .xls, .csv"
               ref={importFileRef}
               style={{ display: 'none' }}
               onChange={handleImportFileChange}
@@ -1491,6 +1602,7 @@ export default function Home() {
 
             <div className="import-blocks">
               {importBlocks.map((block, bIdx) => (
+<<<<<<< HEAD
                 <div className="import-block import-block-col" key={bIdx}>
                   <div className="import-block-row">
                     <span>Blok {bIdx + 1} ({block.weeks.length} minggu)</span>
@@ -1513,6 +1625,15 @@ export default function Home() {
                       </label>
                     ))}
                   </div>
+=======
+                <div className="import-block" key={bIdx}>
+                  <span>Blok {bIdx + 1}{block.platformName ? ` — ${block.platformName}` : ''} ({block.weeks.length} minggu)</span>
+                  <input
+                    type="month"
+                    value={importBlockMonths[bIdx] || ''}
+                    onChange={(e) => updateBlockMonth(bIdx, e.target.value)}
+                  />
+>>>>>>> 0807b5f (feat: parse xlsx calendar import with cell color detection for story and video pillars)
                 </div>
               ))}
             </div>
