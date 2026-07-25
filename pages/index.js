@@ -19,6 +19,16 @@ const EMPTY_FORM = {
   isReference: false,
 };
 
+// Google Sheets (valueInputOption: USER_ENTERED) otomatis mengubah string "true"/"false"
+// jadi boolean, dan saat dibaca lagi lewat API balik sebagai string "TRUE"/"FALSE" (kapital),
+// bukan "true" huruf kecil. Makanya perbandingan strict === 'true' bisa gagal dan brief
+// referensi ikut kehitung di Total Brief. Helper ini menangani semua variannya.
+function isReferenceBrief(b) {
+  const v = b && b.isReference;
+  if (v === true) return true;
+  return String(v || '').trim().toLowerCase() === 'true';
+}
+
 const PLATFORM_COLORS = {
   Instagram: '#af52de',
   Tiktok: '#0071e3',
@@ -240,6 +250,15 @@ function splitCellTitles(raw) {
     .filter(Boolean);
 }
 
+// Tebak platform dari label blok (baris judul tab di atas header Senin..Minggu,
+// mis. "IG JUL" atau "TIKTOK JUL"). Kosong kalau tidak match apa-apa (biar user isi manual).
+function guessPlatformFromLabel(label) {
+  const l = String(label || '').toLowerCase();
+  if (/\btiktok\b|\btt\b/.test(l)) return 'Tiktok';
+  if (/\big\b|instagram/.test(l)) return 'Instagram';
+  return '';
+}
+
 function detectContentPlanBlocks(grid) {
   const blocks = [];
   let i = 0;
@@ -247,6 +266,10 @@ function detectContentPlanBlocks(grid) {
     const row = (grid[i] || []).slice(0, 7).map((c) => String(c || '').trim().toLowerCase());
     const isHeader = CSV_DAY_HEADERS.every((d, idx) => row[idx] === d);
     if (isHeader) {
+      // Baris tepat di atas header "Senin..Minggu" biasanya berisi label tab,
+      // mis. "IG JUL" / "TIKTOK JUL" — dipakai untuk menebak platform otomatis.
+      const labelRow = grid[i - 1] || [];
+      const label = labelRow.map((c) => String(c || '').trim()).filter(Boolean).join(' ');
       const weeks = [];
       let cursor = i + 1;
       while (cursor + 1 < grid.length) {
@@ -271,16 +294,20 @@ function detectContentPlanBlocks(grid) {
           const dayNum = parseInt(m[1], 10);
           // Sisa teks di baris terakhir (sebelum angka tanggal) — kalau ada,
           // dihitung sebagai 1 brief tambahan dari data lama yang belum dirapikan.
+          // source: 'date' = brief singkat yang nempel di baris tanggal -> pilar Story.
           const leftoverOnDateLine = lastLine.replace(/(\d{1,2})\s*$/, '').trim();
-          const titlesFromDateRow = [...dateLines.slice(0, -1), leftoverOnDateLine].filter(Boolean);
-          const titlesFromTitleRow = splitCellTitles(titleRow[col]);
+          const titlesFromDateRow = [...dateLines.slice(0, -1), leftoverOnDateLine]
+            .filter(Boolean)
+            .map((text) => ({ text, source: 'date' }));
+          // source: 'title' = brief utama di baris judul -> pilar Video.
+          const titlesFromTitleRow = splitCellTitles(titleRow[col]).map((text) => ({ text, source: 'title' }));
           const titles = [...titlesFromDateRow, ...titlesFromTitleRow];
           days.push({ dayNum, titles });
         }
         weeks.push(days);
         cursor += 2;
       }
-      blocks.push({ headerRow: i, weeks });
+      blocks.push({ headerRow: i, label, platform: guessPlatformFromLabel(label), weeks });
       i = cursor > i ? cursor : i + 1;
     } else {
       i++;
@@ -303,7 +330,7 @@ function blocksToImportRows(blocks, blockMonths, existingBriefs = []) {
           const [y, m] = my.split('-');
           tglPosting = `${y}-${m}-${String(cell.dayNum).padStart(2, '0')}`;
         }
-        cell.titles.forEach((title) => {
+        cell.titles.forEach(({ text: title, source }) => {
           const alreadyExists = existingSet.has(title.trim().toLowerCase());
           rows.push({
             id: `imp-${rid++}`,
@@ -313,8 +340,10 @@ function blocksToImportRows(blocks, blockMonths, existingBriefs = []) {
             tglPosting,
             include: !alreadyExists,
             alreadyExists,
-            pilar: 'Lainnya',
-            platform: [],
+            // Brief yang nempel di baris tanggal (mis. "UKV Periksa Visa Dulu (o) 8") -> Story.
+            // Brief di baris judul utama -> Video. Bisa diubah manual di form sebelum import.
+            pilar: source === 'date' ? 'Story' : 'Video',
+            platform: block.platform ? [block.platform] : [],
           });
         });
       });
@@ -377,7 +406,7 @@ export default function Home() {
   }, []);
 
   const filteredBriefs = useMemo(() => {
-    const list = briefs.filter((b) => b.isReference !== 'true' && b.isReference !== true);
+    const list = briefs.filter((b) => !isReferenceBrief(b));
     if (weekFilter === null) return list;
     return list.filter((b) => isInWeek(b.tglMasuk, weekFilter));
   }, [briefs, weekFilter]);
@@ -440,7 +469,7 @@ export default function Home() {
       hasilAkhir: b.hasilAkhir || '',
       tglPostingByPlatform: datesMap,
       _prefillDate: '',
-      isReference: b.isReference === 'true' || b.isReference === true,
+      isReference: isReferenceBrief(b),
     });
     setFormMsg('');
     setUploadedFileName('');
@@ -899,7 +928,7 @@ export default function Home() {
                       const style = CALENDAR_STATUS_STYLE[statusOf(b)] || CALENDAR_STATUS_STYLE['Belum Dikerjakan'];
                       const label = it.platform ? platformAbbr(it.platform) : platformLabel(b);
                       const badgeColor = formatColor(it.platform);
-                      const isRef = b.isReference === 'true' || b.isReference === true;
+                      const isRef = isReferenceBrief(b);
                       return (
                         <div
                           key={`${b.id}-${it.platform}-${idx}`}
