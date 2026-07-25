@@ -278,8 +278,46 @@ function isCellRed(cell) {
   return false;
 }
 
-function parseWorkbookToGrid(wb) {
-  const sheet = wb.Sheets[wb.SheetNames[0]];
+const MONTH_MAP = {
+  jan: '01', januari: '01', january: '01',
+  feb: '02', februari: '02', february: '02',
+  mar: '03', maret: '03', march: '03',
+  apr: '04', april: '04',
+  may: '05', mei: '05',
+  jun: '06', juni: '06', june: '06',
+  jul: '07', juli: '07', july: '07',
+  aug: '08', agu: '08', agustus: '08', august: '08',
+  sep: '09', september: '09', sept: '09',
+  oct: '10', okt: '10', oktober: '10', october: '10',
+  nov: '11', november: '11',
+  dec: '12', des: '12', desember: '12', december: '12',
+};
+
+function detectMonthYearFromText(...texts) {
+  const combined = texts.filter(Boolean).join(' ').toLowerCase();
+  if (!combined) return '';
+
+  let year = new Date().getFullYear();
+  const y4Match = combined.match(/\b(202\d)\b/);
+  if (y4Match) {
+    year = parseInt(y4Match[1], 10);
+  } else {
+    const y2Match = combined.match(/\b(2[4-9]|3[0-0])\b/);
+    if (y2Match) {
+      year = 2000 + parseInt(y2Match[1], 10);
+    }
+  }
+
+  for (const [key, num] of Object.entries(MONTH_MAP)) {
+    const regex = new RegExp(`\\b${key}\\b`, 'i');
+    if (regex.test(combined)) {
+      return `${year}-${num}`;
+    }
+  }
+  return '';
+}
+
+function parseSheetToGrid(sheet) {
   if (!sheet || !sheet['!ref']) return [];
   const range = XLSX.utils.decode_range(sheet['!ref']);
   const grid = [];
@@ -297,28 +335,20 @@ function parseWorkbookToGrid(wb) {
   return grid;
 }
 
-// Pecah isi 1 sel jadi beberapa judul brief terpisah. Satu sel bisa berisi lebih
-// dari 1 brief kalau user menekan Enter/Alt+Enter di dalam sel yang sama di Sheets
-// (jadi ada line break literal di dalam cell saat diexport ke CSV).
-// Perhatian: baris lanjutan yang diawali tanda kurung, mis. "(AUDIO DI POV CUSTOMER)",
-// dianggap keterangan/anotasi dari judul di atasnya (bukan brief baru) dan digabung balik.
-function splitCellTitles(raw) {
-  const lines = String(raw || '')
-    .split(/\r\n|\r|\n/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const merged = [];
-  lines.forEach((line) => {
-    if (line.startsWith('(') && merged.length > 0) {
-      merged[merged.length - 1] += ' ' + line;
-    } else {
-      merged.push(line);
-    }
+function parseWorkbookToAllBlocks(wb) {
+  const allBlocks = [];
+  (wb.SheetNames || []).forEach((sheetName) => {
+    const sheet = wb.Sheets[sheetName];
+    const grid = parseSheetToGrid(sheet);
+    const blocks = detectContentPlanBlocks(grid, sheetName);
+    blocks.forEach((b) => {
+      allBlocks.push({ ...b, sheetName });
+    });
   });
-  return merged;
+  return allBlocks;
 }
 
-function detectContentPlanBlocks(grid) {
+function detectContentPlanBlocks(grid, sheetName = '') {
   const blocks = [];
   let i = 0;
   while (i < grid.length) {
@@ -326,17 +356,23 @@ function detectContentPlanBlocks(grid) {
     const isHeader = CSV_DAY_HEADERS.every((d, idx) => row[idx] === d);
     if (isHeader) {
       let platformName = '';
+      let detectedMonth = detectMonthYearFromText(sheetName);
+
       for (let r = Math.max(0, i - 5); r < i; r++) {
         const str = (grid[r] || [])
           .map((c) => String(c.val !== undefined ? c.val : c || ''))
-          .join(' ')
-          .toLowerCase();
-        if (str.includes('tiktok') || str.includes('tok')) {
-          platformName = 'Tiktok';
-          break;
-        } else if (str.includes('ig') || str.includes('instagram')) {
-          platformName = 'Instagram';
-          break;
+          .join(' ');
+        const strLower = str.toLowerCase();
+        if (!platformName) {
+          if (strLower.includes('tiktok') || strLower.includes('tok')) {
+            platformName = 'Tiktok';
+          } else if (strLower.includes('ig') || strLower.includes('instagram')) {
+            platformName = 'Instagram';
+          }
+        }
+        if (!detectedMonth) {
+          const m = detectMonthYearFromText(str);
+          if (m) detectedMonth = m;
         }
       }
 
@@ -381,7 +417,7 @@ function detectContentPlanBlocks(grid) {
         weeks.push(days);
         cursor += 2;
       }
-      blocks.push({ headerRow: i, platformName, weeks });
+      blocks.push({ headerRow: i, platformName, detectedMonth, weeks });
       i = cursor > i ? cursor : i + 1;
     } else {
       i++;
@@ -857,6 +893,29 @@ export default function Home() {
     applyImportRows(importBlocks, importBlockMonths, platforms);
   }
 
+  function applyStartMonthSequential(startYYYYMM) {
+    if (!startYYYYMM) return;
+    let [y, m] = startYYYYMM.split('-').map((n) => parseInt(n, 10));
+    const newMonths = [];
+    let currentY = y;
+    let currentM = m;
+
+    importBlocks.forEach((block, idx) => {
+      if (idx > 0 && (block.platformName === 'Instagram' || block.sheetName !== importBlocks[idx - 1].sheetName)) {
+        currentM++;
+        if (currentM > 12) {
+          currentM = 1;
+          currentY++;
+        }
+      }
+      const mm = String(currentM).padStart(2, '0');
+      newMonths.push(`${currentY}-${mm}`);
+    });
+
+    setImportBlockMonths(newMonths);
+    applyImportRows(importBlocks, newMonths, importBlockPlatforms);
+  }
+
   function handleImportFileChange(e) {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -866,14 +925,13 @@ export default function Home() {
       try {
         const data = new Uint8Array(evt.target.result);
         const wb = XLSX.read(data, { type: 'array', cellStyles: true });
-        const grid = parseWorkbookToGrid(wb);
-        const blocks = detectContentPlanBlocks(grid);
+        const blocks = parseWorkbookToAllBlocks(wb);
         if (blocks.length === 0) {
           setImportMsg('Tidak menemukan pola grid kalender (header Senin–Minggu) di file ini.');
           return;
         }
-        const months = blocks.map(() => '');
-        const platforms = blocks.map(() => '');
+        const months = blocks.map((b) => b.detectedMonth || '');
+        const platforms = blocks.map((b) => b.platformName || '');
         setImportBlocks(blocks);
         setImportBlockMonths(months);
         setImportBlockPlatforms(platforms);
@@ -1579,17 +1637,23 @@ export default function Home() {
               </label>
             </div>
 
-            <p className="import-hint" style={{ marginTop: 0 }}>
-              File CSV nggak nyimpen nama Table (mis. "IG JUL") — itu metadata Google Sheets yang hilang saat
-              export CSV. Pilih platform manual untuk tiap blok di bawah ini.
-            </p>
-            <div className="import-quickfill">
-              <span>Terapkan ke semua blok:</span>
-              {PLATFORMS.map((p) => (
-                <button key={p} type="button" className="btn btn-outline btn-sm" onClick={() => applyPlatformToAllBlocks(p)}>
-                  {p}
-                </button>
-              ))}
+            <div className="import-quickfill" style={{ background: 'var(--bg)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--hair)', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ fontWeight: 500, fontSize: 13 }}>🗓️ Isi Bulan Awal (Urut Otomatis Semua Blok):</span>
+                <input
+                  type="month"
+                  style={{ border: '1px solid var(--hair)', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontFamily: 'inherit' }}
+                  onChange={(e) => applyStartMonthSequential(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>📱 Terapkan Platform ke semua blok:</span>
+                {PLATFORMS.map((p) => (
+                  <button key={p} type="button" className="btn btn-outline btn-sm" onClick={() => applyPlatformToAllBlocks(p)}>
+                    {p}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="import-blocks">
