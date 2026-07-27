@@ -2016,7 +2016,7 @@ export default function Home() {
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
                     <span>{selectedCalendarBrief.brief.tglPosting || '-'}</span>
-                    {selectedCalendarBrief.brief.tglPosting && selectedCalendarBrief.brief.tglPosting.includes(today) && (
+                    {selectedCalendarBrief.brief && String(selectedCalendarBrief.brief.tglPosting || '').includes(today) && (
                       <span className="due-today-badge">🔥 Hari Ini</span>
                     )}
                   </div>
@@ -2071,7 +2071,7 @@ export default function Home() {
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {selectedCalendarBrief.brief.hasilAkhir && (
+                {selectedCalendarBrief.brief && selectedCalendarBrief.brief.hasilAkhir && (
                   <a
                     href={selectedCalendarBrief.brief.hasilAkhir}
                     target="_blank"
@@ -2088,9 +2088,11 @@ export default function Home() {
                   className="btn btn-outline"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13.5, fontWeight: 600 }}
                   onClick={() => {
-                    const bId = selectedCalendarBrief.brief.id;
-                    setSelectedCalendarBrief(null);
-                    enterEditMode(bId);
+                    if (selectedCalendarBrief && selectedCalendarBrief.brief) {
+                      const bId = selectedCalendarBrief.brief.id;
+                      setSelectedCalendarBrief(null);
+                      enterEditMode(bId);
+                    }
                   }}
                   title="Edit Brief"
                 >
