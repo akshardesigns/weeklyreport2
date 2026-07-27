@@ -24,7 +24,8 @@ const EMPTY_FORM = {
 // bukan "true" huruf kecil. Makanya perbandingan strict === 'true' bisa gagal dan brief
 // referensi ikut kehitung di Total Brief. Helper ini menangani semua variannya.
 function isReferenceBrief(b) {
-  const v = b && b.isReference;
+  if (!b) return false;
+  const v = b.isReference;
   if (v === true) return true;
   return String(v || '').trim().toLowerCase() === 'true';
 }
@@ -52,7 +53,7 @@ function PLATFORM_ORDER_INDEX(platform) {
 // (nilai pilar yang tersimpan tetap "Video" karena dipakai bareng sama Tiktok)
 const IG_PILAR_ORDER = { Story: 0, Carousel: 1, Feed: 2, Video: 3 };
 function IG_PILAR_ORDER_INDEX(pilar) {
-  return pilar in IG_PILAR_ORDER ? IG_PILAR_ORDER[pilar] : 99;
+  return pilar && pilar in IG_PILAR_ORDER ? IG_PILAR_ORDER[pilar] : 99;
 }
 
 // Label pilar khusus tampilan: pilar "Video" ditampilkan sebagai "Reels" kalau platform-nya
@@ -73,12 +74,14 @@ function formatColor(platform) {
 // platform disimpan di Sheets sebagai string dipisah koma ("Instagram,Tiktok")
 // supaya satu brief bisa menyasar lebih dari satu platform sekaligus.
 function platformsOf(b) {
+  if (!b) return [];
   return (b.platform || '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
 }
 function platformLabel(b) {
+  if (!b) return '-';
   const list = platformsOf(b);
   return list.length ? list.join(' + ') : '-';
 }
@@ -89,6 +92,7 @@ function platformLabel(b) {
 // Data lama yang cuma punya 1 tanggal untuk banyak platform tetap dianggap
 // tanggal yang sama untuk semua platform (backward-compatible).
 function platformDatePairs(b) {
+  if (!b) return [];
   const plats = platformsOf(b);
   const dates = (b.tglPosting || '').split(',').map((s) => s.trim());
   if (plats.length === 0) {
@@ -124,13 +128,14 @@ function maxDays(pilar) {
   return pilar === 'Ads' || pilar === 'Carousel' ? 2 : 3;
 }
 function kpiFor(b) {
-  if (!b.tglSelesai) return null;
+  if (!b || !b.tglSelesai || !b.tglMasuk) return null;
   const start = new Date(b.tglMasuk + 'T00:00:00');
   const end = new Date(b.tglSelesai + 'T00:00:00');
   const diffDays = Math.round((end - start) / 86400000);
   return diffDays <= maxDays(b.pilar) ? 'On Time' : 'Late';
 }
 function statusOf(b) {
+  if (!b) return 'Belum Dikerjakan';
   return b.status ? b.status : 'Belum Dikerjakan';
 }
 function pillClass(status) {
@@ -888,10 +893,13 @@ export default function Home() {
     // baru Tiktok, sisanya menyusul.
     Object.keys(map).forEach((date) => {
       map[date].sort((a, b) => {
+        if (!a || !b) return 0;
         const platformDiff = PLATFORM_ORDER_INDEX(a.platform) - PLATFORM_ORDER_INDEX(b.platform);
         if (platformDiff !== 0) return platformDiff;
         if (a.platform === 'Instagram') {
-          return IG_PILAR_ORDER_INDEX(a.brief.pilar) - IG_PILAR_ORDER_INDEX(b.brief.pilar);
+          const aPilar = a.brief ? a.brief.pilar : '';
+          const bPilar = b.brief ? b.brief.pilar : '';
+          return IG_PILAR_ORDER_INDEX(aPilar) - IG_PILAR_ORDER_INDEX(bPilar);
         }
         return 0;
       });
