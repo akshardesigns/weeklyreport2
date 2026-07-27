@@ -919,6 +919,7 @@ export default function Home() {
         .sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk)),
     [briefs]
   );
+  const monthGrid = useMemo(() => buildMonthGrid(calendarMonth), [calendarMonth]);
   const [expandedCell, setExpandedCell] = useState(null);
   const [selectedCalendarBrief, setSelectedCalendarBrief] = useState(null);
   const [dragOverDate, setDragOverDate] = useState(null);
