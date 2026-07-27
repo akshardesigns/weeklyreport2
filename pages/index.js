@@ -977,13 +977,18 @@ export default function Home() {
         mediaUrl.includes('drive.google.com') ||
         mediaUrl.includes('dropbox.com') ||
         mediaUrl.includes('canva.com');
-      const isDirectFile = /\.(mp4|mov|png|jpg|jpeg|webp|gif)(\?.*)?$/i.test(mediaUrl);
 
-      if (isDirectFile && !isCloudFolder) {
-        const cleanName = brief.brief ? brief.brief.replace(/[^a-z0-9]/gi, '_') : 'media_asset';
-        await forceDownloadFile(mediaUrl, `${cleanName}.mp4`);
-      } else {
+      if (isCloudFolder) {
         window.open(mediaUrl, '_blank');
+      } else {
+        const cleanName = brief.brief ? brief.brief.replace(/[^a-z0-9]/gi, '_') : 'media_asset';
+        const downloadApiUrl = `/api/download?url=${encodeURIComponent(mediaUrl)}&filename=${encodeURIComponent(cleanName)}`;
+        const a = document.createElement('a');
+        a.href = downloadApiUrl;
+        a.download = `${cleanName}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
     }
     const plat = (targetPlatform || platformsOf(brief)[0] || '').toLowerCase();
@@ -1278,42 +1283,6 @@ export default function Home() {
             />
           </div>
           {importMsg && !importOpen && <p className="msg">{importMsg}</p>}
-
-          {!dismissedReminder && todayDueBriefs.length > 0 && (
-            <div className="gcal-reminder-card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div className="gcal-reminder-icon">⏰</div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
-                    Pengingat Posting Hari Ini ({todayDueBriefs.length} Brief Waktunya Diunggah)
-                  </div>
-                  <div style={{ fontSize: 12.5, color: 'var(--sub)', marginTop: 2 }}>
-                    {todayDueBriefs.map((b) => b.brief).join(' · ')}
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <a
-                  href={getWANotifURL(todayDueBriefs[0])}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline btn-sm"
-                  style={{ color: '#128C7E', borderColor: 'rgba(37,211,102,0.45)', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, textDecoration: 'none' }}
-                >
-                  💬 Notif WA (085603524508)
-                </a>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setDismissedReminder(true)}
-                  title="Tutup Pengingat"
-                  style={{ fontSize: 14, padding: '4px 8px' }}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          )}
 
           <div className="calendar-grid">
             {DAY_LABELS.map((d) => (
@@ -2168,17 +2137,6 @@ export default function Home() {
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <a
-                  href={getWANotifURL(selectedCalendarBrief.brief)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', fontSize: 13, fontWeight: 600, color: '#128C7E', borderColor: 'rgba(37,211,102,0.45)', textDecoration: 'none' }}
-                  title="Kirim Notifikasi WA ke 085603524508"
-                >
-                  💬 Notif WA
-                </a>
-
                 {selectedCalendarBrief.brief && (
                   <button
                     type="button"
