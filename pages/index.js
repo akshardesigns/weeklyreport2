@@ -2159,9 +2159,11 @@ export default function Home() {
                         selectedCalendarBrief.platform
                       );
                     }}
-                    title="Download media & buka aplikasi platform"
+                    title="Akses media & buka aplikasi platform"
                   >
-                    📥 Download &amp; Buka App
+                    {selectedCalendarBrief.brief.hasilAkhir && selectedCalendarBrief.brief.hasilAkhir.includes('/folders/')
+                      ? '📂 Buka Folder Drive & App'
+                      : '📥 Download File & App'}
                   </button>
                 )}
 
