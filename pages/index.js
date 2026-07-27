@@ -905,9 +905,66 @@ export default function Home() {
         .sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk)),
     [briefs]
   );
-  const monthGrid = useMemo(() => buildMonthGrid(calendarMonth), [calendarMonth]);
   const [expandedCell, setExpandedCell] = useState(null);
+  const [selectedCalendarBrief, setSelectedCalendarBrief] = useState(null);
+  const [dragOverDate, setDragOverDate] = useState(null);
   const today = todayISO();
+
+  async function updateBriefPostingDate(brief, targetPlatform, targetDate) {
+    const plats = platformsOf(brief);
+    const pairs = platformDatePairs(brief);
+
+    let newDates = [];
+    if (plats.length <= 1) {
+      newDates = [targetDate];
+    } else {
+      newDates = plats.map((p) => {
+        if (p === targetPlatform) return targetDate;
+        const found = pairs.find((pair) => pair.platform === p);
+        return found ? found.date : '';
+      });
+    }
+
+    const updatedTglPosting = newDates.join(',');
+
+    // Optimistic UI update
+    setBriefs((prev) =>
+      prev.map((item) => (item.id === brief.id ? { ...item, tglPosting: updatedTglPosting } : item))
+    );
+
+    try {
+      const payload = {
+        ...brief,
+        tglPosting: updatedTglPosting,
+      };
+      const res = await fetch(`/api/briefs/${brief.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Gagal menyimpan perubahan tanggal posting');
+      }
+    } catch (err) {
+      console.error('Failed to save drop date update:', err);
+      loadBriefs();
+    }
+  }
+
+  function handleDropOnDate(e, targetDate) {
+    try {
+      const rawData = e.dataTransfer.getData('application/json');
+      if (!rawData) return;
+      const { briefId, platform } = JSON.parse(rawData);
+      const brief = briefs.find((b) => String(b.id) === String(briefId));
+      if (!brief) return;
+
+      updateBriefPostingDate(brief, platform, targetDate);
+    } catch (err) {
+      console.error('Error handling drag drop:', err);
+    }
+  }
 
   // --- Import CSV (transisi dari sheet kalender manual lama) ---
   const importFileRef = useRef(null);
@@ -1148,12 +1205,26 @@ export default function Home() {
             {monthGrid.map((cell) => {
               const items = postingByDate[cell.iso] || [];
               const isOpen = expandedCell === cell.iso;
+              const isOver = dragOverDate === cell.iso;
               return (
                 <div
                   key={cell.iso}
-                  className={`calendar-cell${cell.inMonth ? '' : ' is-outside'}${cell.iso === today ? ' is-today' : ''}`}
+                  className={`calendar-cell${cell.inMonth ? '' : ' is-outside'}${cell.iso === today ? ' is-today' : ''}${isOver ? ' is-drag-over' : ''}`}
                   onDoubleClick={() => openAddForm({ _prefillDate: cell.iso })}
-                  title="Klik dua kali untuk tambah brief di tanggal ini"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverDate !== cell.iso) setDragOverDate(cell.iso);
+                  }}
+                  onDragLeave={(e) => {
+                    if (dragOverDate === cell.iso) setDragOverDate(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOverDate(null);
+                    handleDropOnDate(e, cell.iso);
+                  }}
+                  title="Klik dua kali untuk tambah brief di tanggal ini, atau geser (drag & drop) brief ke sini"
                 >
                   <div className="calendar-cell-date">{cell.date.getDate()}</div>
                   <div className="calendar-cell-items">
@@ -1168,11 +1239,17 @@ export default function Home() {
                           key={`${b.id}-${it.platform}-${idx}`}
                           className={`calendar-item${isRef ? ' is-reference' : ''}`}
                           style={{ background: style.bg, borderLeftColor: style.border }}
+                          draggable={true}
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            e.dataTransfer.setData('application/json', JSON.stringify({ briefId: b.id, platform: it.platform }));
+                            e.dataTransfer.effectAllowed = 'move';
+                          }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            enterEditMode(b.id);
+                            setSelectedCalendarBrief({ brief: b, platform: it.platform });
                           }}
-                          title={`${isRef ? '[Transisi/Referensi] ' : ''}${it.platform || platformLabel(b)} · ${pilarDisplayLabel(it.platform, b.pilar)} · ${b.brief} — ${statusOf(b)}`}
+                          title={`${isRef ? '[Transisi/Referensi] ' : ''}${it.platform || platformLabel(b)} · ${pilarDisplayLabel(it.platform, b.pilar)} · ${b.brief} — Klik untuk detail`}
                         >
                           <span className="calendar-item-badge" style={{ background: badgeColor }}>
                             {isRef ? '📌 ' : ''}{label} · {pilarDisplayLabel(it.platform, b.pilar)}
@@ -1237,14 +1314,25 @@ export default function Home() {
             ) : (
               <div className="unscheduled-list">
                 {unscheduledBriefs.map((b) => (
-                  <div className="unscheduled-item" key={b.id} onClick={() => enterEditMode(b.id)}>
+                  <div
+                    className="unscheduled-item"
+                    key={b.id}
+                    draggable={true}
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      const firstPlat = platformsOf(b)[0] || 'Instagram';
+                      e.dataTransfer.setData('application/json', JSON.stringify({ briefId: b.id, platform: firstPlat }));
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onClick={() => enterEditMode(b.id)}
+                  >
                     {platformsOf(b).map((p) => (
                       <span key={p} className="dot" style={{ background: PLATFORM_COLORS[p] || 'var(--grey)' }} />
                     ))}
                     <span className="unscheduled-brief">{b.brief}</span>
                     <span className="tag">{b.pilar}</span>
                     <span className="tag">{platformLabel(b)}</span>
-                    <span className="unscheduled-hint">Klik untuk atur tanggal posting</span>
+                    <span className="unscheduled-hint">Geser (drag & drop) ke tanggal kalender atau klik untuk atur</span>
                   </div>
                 ))}
               </div>
@@ -1865,6 +1953,64 @@ export default function Home() {
               <button type="button" className="btn btn-ghost" onClick={closeImportModal}>Batal</button>
               <button type="button" className="btn btn-primary" onClick={submitImportRows} disabled={importing}>
                 {importing ? importProgress || 'Mengimpor…' : `Import ${importRows.filter((r) => r.include).length} Brief`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedCalendarBrief && (
+        <div className="modal-overlay" onClick={() => setSelectedCalendarBrief(null)}>
+          <div className="modal-card" style={{ maxWidth: 440, padding: '24px 28px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="form-head" style={{ marginBottom: 16 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Detail Brief</h3>
+              <button className="modal-close" onClick={() => setSelectedCalendarBrief(null)} title="Tutup">✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
+                  Judul Brief
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.45 }}>
+                  {selectedCalendarBrief.brief.brief}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 24 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
+                    Tanggal Brief Masuk
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>
+                    {selectedCalendarBrief.brief.tglMasuk || '-'}
+                  </div>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
+                    Tanggal Posting
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>
+                    {selectedCalendarBrief.brief.tglPosting || '-'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--hair)' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 13.5, fontWeight: 600 }}
+                onClick={() => {
+                  const bId = selectedCalendarBrief.brief.id;
+                  setSelectedCalendarBrief(null);
+                  enterEditMode(bId);
+                }}
+                title="Edit Brief"
+              >
+                ✏️ Edit Brief
               </button>
             </div>
           </div>
