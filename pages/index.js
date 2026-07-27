@@ -931,43 +931,78 @@ export default function Home() {
     setTimeout(() => setToastMsg(null), 5000);
   }
 
-  function getWANotifURL(brief) {
-    if (!brief) return 'https://wa.me/6285603524508';
-    const msg = `🔥 PENGINGAT POSTING HARI INI!\n\n📌 Judul Brief: ${brief.brief || '-'}\n📱 Platform: ${platformLabel(brief)}\n🏷️ Pilar: ${brief.pilar || '-'}\n🗓️ Tanggal Posting: ${brief.tglPosting || '-'}\n\n🔗 Link Media: ${brief.hasilAkhir || '-'}`;
-    return `https://wa.me/6285603524508?text=${encodeURIComponent(msg)}`;
+  const waAutoNotifiedRef = useRef(false);
+
+  useEffect(() => {
+    if (!briefs || briefs.length === 0) return;
+    if (waAutoNotifiedRef.current) return;
+
+    const todayStr = todayISO();
+    const todayBriefs = briefs.filter(
+      (b) =>
+        b &&
+        String(b.tglPosting || '').includes(todayStr) &&
+        statusOf(b) !== 'Selesai Terupload'
+    );
+
+    if (todayBriefs.length > 0) {
+      waAutoNotifiedRef.current = true;
+      const lines = [
+        `🔥 PENGINGAT POSTING HARI INI (${fmtDate(todayStr)})!`,
+        ``,
+        `Terdapat ${todayBriefs.length} brief yang harus diunggah hari ini:`,
+        ``,
+      ];
+
+      todayBriefs.forEach((b, idx) => {
+        lines.push(`${idx + 1}. 📌 ${b.brief || '-'}`);
+        lines.push(`   📱 Platform: ${platformLabel(b)}`);
+        lines.push(`   🏷️ Pilar: ${b.pilar || '-'}`);
+        if (b.hasilAkhir) {
+          lines.push(`   🔗 Media: ${b.hasilAkhir}`);
+        }
+        lines.push(``);
+      });
+
+      const fullMessage = lines.join('\n');
+      const waUrl = `https://wa.me/6285603524508?text=${encodeURIComponent(fullMessage)}`;
+
+      setTimeout(() => {
+        window.open(waUrl, '_blank');
+      }, 1200);
+    }
+  }, [briefs]);
+
+  async function forceDownloadFile(url, filename) {
+    if (!url) return;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename || 'media_asset';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    } catch (err) {
+      console.error('Blob download failed, opening URL:', err);
+      window.open(url, '_blank');
+    }
   }
 
-  function triggerAutoDownloadAndPlatformRedirect(brief, targetPlatform) {
+  async function triggerAutoDownloadAndPlatformRedirect(brief, targetPlatform) {
     if (!brief) return;
     const mediaUrl = brief.hasilAkhir;
     if (mediaUrl) {
-      try {
-        const a = document.createElement('a');
-        a.href = mediaUrl;
-        a.download = brief.brief ? `${brief.brief.replace(/[^a-z0-9]/gi, '_')}` : 'media_asset';
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } catch (e) {
-        window.open(mediaUrl, '_blank');
-      }
+      const cleanName = brief.brief ? brief.brief.replace(/[^a-z0-9]/gi, '_') : 'media_asset';
+      await forceDownloadFile(mediaUrl, `${cleanName}.mp4`);
     }
     const plat = (targetPlatform || platformsOf(brief)[0] || '').toLowerCase();
     const dest = plat.includes('tiktok') || plat.includes('tok') ? 'https://www.tiktok.com' : 'https://www.instagram.com';
     window.open(dest, '_blank');
   }
-
-  const todayDueBriefs = useMemo(
-    () =>
-      briefs.filter(
-        (b) =>
-          b &&
-          String(b.tglPosting || '').includes(today) &&
-          statusOf(b) !== 'Selesai Terupload'
-      ),
-    [briefs, today]
-  );
 
   async function updateBriefPostingDate(brief, targetPlatform, targetDate) {
     const plats = platformsOf(brief);
@@ -1256,27 +1291,6 @@ export default function Home() {
             />
           </div>
           {importMsg && !importOpen && <p className="msg">{importMsg}</p>}
-
-          {todayDueBriefs.length > 0 && (
-            <div className="wa-alert-banner">
-              <div>
-                <div className="wa-alert-title">
-                  <span>🔥</span> Ada {todayDueBriefs.length} Brief Jadwal Posting Hari Ini!
-                </div>
-                <div className="wa-alert-desc">
-                  Kirim notifikasi otomatis ke WhatsApp <b>085603524508</b> untuk mengingatkan tim posting.
-                </div>
-              </div>
-              <a
-                href={getWANotifURL(todayDueBriefs[0])}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-wa"
-              >
-                💬 Kirim Notif WA ke 085603524508
-              </a>
-            </div>
-          )}
 
           <div className="calendar-grid">
             {DAY_LABELS.map((d) => (
