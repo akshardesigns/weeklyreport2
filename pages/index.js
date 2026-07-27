@@ -765,6 +765,9 @@ export default function Home() {
           throw new Error(data.error || 'Gagal menambah brief');
         }
       }
+      if (form.status === 'Selesai Terupload') {
+        triggerToast(`Brief "${form.brief}" telah Selesai Terupload!`);
+      }
       closeForm();
       await loadBriefs();
     } catch (err) {
@@ -916,11 +919,16 @@ export default function Home() {
         .sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk)),
     [briefs]
   );
-  const monthGrid = useMemo(() => buildMonthGrid(calendarMonth), [calendarMonth]);
   const [expandedCell, setExpandedCell] = useState(null);
   const [selectedCalendarBrief, setSelectedCalendarBrief] = useState(null);
   const [dragOverDate, setDragOverDate] = useState(null);
+  const [toastMsg, setToastMsg] = useState(null);
   const today = todayISO();
+
+  function triggerToast(msg) {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 5000);
+  }
 
   async function updateBriefPostingDate(brief, targetPlatform, targetDate) {
     const plats = platformsOf(brief);
@@ -1266,6 +1274,9 @@ export default function Home() {
                           <span className="calendar-item-badge" style={{ background: badgeColor }}>
                             {isRef ? '📌 ' : ''}{label} · {pilarDisplayLabel(it.platform, b.pilar)}
                           </span>
+                          {cell.iso === today && (
+                            <span className="due-today-badge">🔥 Hari Ini</span>
+                          )}
                           <div className="calendar-item-title">{b.brief}</div>
                         </div>
                       );
@@ -2003,8 +2014,11 @@ export default function Home() {
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
                     Tanggal Posting
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>
-                    {selectedCalendarBrief.brief.tglPosting || '-'}
+                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                    <span>{selectedCalendarBrief.brief.tglPosting || '-'}</span>
+                    {selectedCalendarBrief.brief.tglPosting && selectedCalendarBrief.brief.tglPosting.includes(today) && (
+                      <span className="due-today-badge">🔥 Hari Ini</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2041,7 +2055,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--hair)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--hair)', flexWrap: 'wrap', gap: 10 }}>
               <button
                 type="button"
                 className="btn btn-outline"
@@ -2056,20 +2070,44 @@ export default function Home() {
                 🗑️ Hapus Brief
               </button>
 
-              <button
-                type="button"
-                className="btn btn-outline"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13.5, fontWeight: 600 }}
-                onClick={() => {
-                  const bId = selectedCalendarBrief.brief.id;
-                  setSelectedCalendarBrief(null);
-                  enterEditMode(bId);
-                }}
-                title="Edit Brief"
-              >
-                ✏️ Edit Brief
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {selectedCalendarBrief.brief.hasilAkhir && (
+                  <a
+                    href={selectedCalendarBrief.brief.hasilAkhir}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-primary"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13.5, fontWeight: 600, textDecoration: 'none' }}
+                  >
+                    🎬 Buka Media
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13.5, fontWeight: 600 }}
+                  onClick={() => {
+                    const bId = selectedCalendarBrief.brief.id;
+                    setSelectedCalendarBrief(null);
+                    enterEditMode(bId);
+                  }}
+                  title="Edit Brief"
+                >
+                  ✏️ Edit Brief
+                </button>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {toastMsg && (
+        <div className="toast-notification">
+          <span style={{ fontSize: 20 }}>🎉</span>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)' }}>Notifikasi Status</div>
+            <div style={{ fontSize: 12.5, color: 'var(--sub)', marginTop: 2 }}>{toastMsg}</div>
           </div>
         </div>
       )}
