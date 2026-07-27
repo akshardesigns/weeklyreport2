@@ -1996,6 +1996,26 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
+                  Sumber / Referensi
+                </div>
+                <div style={{ fontSize: 13.5, color: 'var(--ink)', wordBreak: 'break-all' }}>
+                  {selectedCalendarBrief.brief.hasilAkhir ? (
+                    <a
+                      href={selectedCalendarBrief.brief.hasilAkhir}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#0071e3', textDecoration: 'none', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      🔗 {selectedCalendarBrief.brief.hasilAkhir}
+                    </a>
+                  ) : (
+                    <span style={{ color: 'var(--sub)' }}>-</span>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--hair)' }}>
