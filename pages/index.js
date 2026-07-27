@@ -63,9 +63,9 @@ function pilarDisplayLabel(platform, pilar) {
   return pilar;
 }
 
-// Warna badge platform di Kalender Konten — pakai warna khas brand masing-masing,
-// nggak berubah walau format kontennya (Feed/Story/Carousel/Video) beda.
-function formatColor(platform) {
+// Warna badge platform/pilar di Kalender Konten — pilar Story berwarna biru (#0071e3).
+function formatColor(platform, pilar) {
+  if (pilar === 'Story') return '#0071e3';
   if (platform === 'Instagram') return 'linear-gradient(135deg, #833ab4, #e1306c)';
   if (platform === 'Tiktok') return '#000000';
   return '#8e8e93';
@@ -775,7 +775,7 @@ export default function Home() {
   }
 
   async function handleDelete(id) {
-    if (!confirm('Hapus brief ini?')) return;
+    if (!confirm('Apakah Anda yakin ingin menghapus brief ini?')) return;
     try {
       const res = await fetch(`/api/briefs/${id}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -783,6 +783,9 @@ export default function Home() {
         throw new Error(data.error || 'Gagal menghapus brief');
       }
       if (editingId === id) closeForm();
+      if (selectedCalendarBrief && selectedCalendarBrief.brief && selectedCalendarBrief.brief.id === id) {
+        setSelectedCalendarBrief(null);
+      }
       await loadBriefs();
     } catch (err) {
       alert(err.message);
@@ -842,9 +845,9 @@ export default function Home() {
   const maxStatus = Math.max(1, ...statuses.map((s) => countStatus(s.name)));
 
   const pilarColors = {
-    Ads: '#0071e3',
+    Ads: '#ff9500',
     Feed: '#af52de',
-    Story: '#ff375f',
+    Story: '#0071e3',
     Carousel: '#64d2ff',
     Reels: '#ff9500',
     Lainnya: '#8e8e93',
@@ -1241,7 +1244,7 @@ export default function Home() {
                       const b = it.brief;
                       const style = CALENDAR_STATUS_STYLE[statusOf(b)] || CALENDAR_STATUS_STYLE['Belum Dikerjakan'];
                       const label = it.platform ? platformAbbr(it.platform) : platformLabel(b);
-                      const badgeColor = formatColor(it.platform);
+                      const badgeColor = formatColor(it.platform, b && b.pilar);
                       const isRef = isReferenceBrief(b);
                       return (
                         <div
@@ -2027,11 +2030,25 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--hair)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--hair)' }}>
               <button
                 type="button"
                 className="btn btn-outline"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 13.5, fontWeight: 600 }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13.5, fontWeight: 600, color: 'var(--red)', borderColor: 'rgba(255,59,48,0.35)' }}
+                onClick={() => {
+                  if (selectedCalendarBrief && selectedCalendarBrief.brief) {
+                    handleDelete(selectedCalendarBrief.brief.id);
+                  }
+                }}
+                title="Hapus Brief"
+              >
+                🗑️ Hapus Brief
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13.5, fontWeight: 600 }}
                 onClick={() => {
                   const bId = selectedCalendarBrief.brief.id;
                   setSelectedCalendarBrief(null);
