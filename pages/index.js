@@ -14,6 +14,7 @@ const EMPTY_FORM = {
   status: '',
   tglSelesai: '',
   hasilAkhir: '',
+  referensi: '',
   tglPostingByPlatform: {},
   _prefillDate: '',
   isReference: false,
@@ -656,6 +657,7 @@ export default function Home() {
       status: b.status,
       tglSelesai: b.tglSelesai || '',
       hasilAkhir: b.hasilAkhir || '',
+      referensi: b.referensi || '',
       tglPostingByPlatform: datesMap,
       _prefillDate: '',
       isReference: isReferenceBrief(b),
@@ -740,6 +742,7 @@ export default function Home() {
       status: form.status,
       tglSelesai: form.tglSelesai,
       hasilAkhir: form.hasilAkhir,
+      referensi: form.referensi,
       tglPosting: platformDates.join(','),
       isReference: form.isReference ? 'true' : 'false',
     };
@@ -1632,7 +1635,8 @@ export default function Home() {
                     <th>Status</th>
                     <th>Tanggal Selesai</th>
                     <th>KPI</th>
-                    <th>Sumber/Referensi</th>
+                    <th>Hasil Final</th>
+                    <th>Referensi</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -1655,7 +1659,16 @@ export default function Home() {
                         <td>
                           {b.hasilAkhir ? (
                             <a className="result-link" href={b.hasilAkhir} target="_blank" rel="noopener noreferrer">
-                              Buka ↗
+                              Hasil ↗
+                            </a>
+                          ) : (
+                            <span className="kpi-none">-</span>
+                          )}
+                        </td>
+                        <td>
+                          {b.referensi ? (
+                            <a className="result-link" href={b.referensi} target="_blank" rel="noopener noreferrer">
+                              Ref ↗
                             </a>
                           ) : (
                             <span className="kpi-none">-</span>
@@ -1804,12 +1817,12 @@ export default function Home() {
                   )}
                 </div>
                 <div className="field span3">
-                  <label htmlFor="hasilAkhir">Sumber/Referensi (link atau file)</label>
+                  <label htmlFor="hasilAkhir">Hasil Final (link media atau file)</label>
                   <div className="hasil-akhir-row">
                     <input
                       type="text"
                       id="hasilAkhir"
-                      placeholder="Tempel link (Drive, Canva, dll)…"
+                      placeholder="Tempel link Hasil Final (Drive, Canva, mp4, dll)…"
                       value={form.hasilAkhir}
                       onChange={(e) => {
                         setForm({ ...form, hasilAkhir: e.target.value });
@@ -1828,6 +1841,16 @@ export default function Home() {
                       <button type="button" className="hasil-akhir-clear" onClick={clearHasilAkhir} title="Hapus">✕</button>
                     </div>
                   )}
+                </div>
+                <div className="field span3">
+                  <label htmlFor="referensi">Referensi (link rujukan / benchmark)</label>
+                  <input
+                    type="text"
+                    id="referensi"
+                    placeholder="Tempel link Referensi (Instagram, TikTok, Web, dll)…"
+                    value={form.referensi}
+                    onChange={(e) => setForm({ ...form, referensi: e.target.value })}
+                  />
                 </div>
                 <div className="field span3">
                   <label className="checkbox-chip" style={{ background: 'var(--bg)', border: '1px solid var(--hair)', padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2113,7 +2136,7 @@ export default function Home() {
 
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
-                  Sumber / Referensi
+                  Hasil Final
                 </div>
                 <div style={{ fontSize: 13.5, color: 'var(--ink)', wordBreak: 'break-all' }}>
                   {selectedCalendarBrief.brief.hasilAkhir ? (
@@ -2123,7 +2146,27 @@ export default function Home() {
                       rel="noopener noreferrer"
                       style={{ color: '#0071e3', textDecoration: 'none', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                     >
-                      🔗 {selectedCalendarBrief.brief.hasilAkhir}
+                      🎬 {selectedCalendarBrief.brief.hasilAkhir}
+                    </a>
+                  ) : (
+                    <span style={{ color: 'var(--sub)' }}>-</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
+                  Referensi
+                </div>
+                <div style={{ fontSize: 13.5, color: 'var(--ink)', wordBreak: 'break-all' }}>
+                  {selectedCalendarBrief.brief.referensi ? (
+                    <a
+                      href={selectedCalendarBrief.brief.referensi}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#0071e3', textDecoration: 'none', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      🔗 {selectedCalendarBrief.brief.referensi}
                     </a>
                   ) : (
                     <span style={{ color: 'var(--sub)' }}>-</span>
