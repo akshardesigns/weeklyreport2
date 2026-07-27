@@ -1,17 +1,31 @@
 export default async function handler(req, res) {
-  const { url, filename } = req.query;
+  let { url, filename } = req.query;
 
   if (!url) {
     return res.status(400).json({ error: 'Missing url parameter' });
   }
 
+  // Convert Google Drive view link to direct download link
+  if (url.includes('drive.google.com')) {
+    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      url = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+    }
+  }
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { redirect: 'follow' });
     if (!response.ok) {
       return res.redirect(302, url);
     }
 
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
+
+    // If response is HTML (e.g. Google Drive preview or login page), fallback to direct URL
+    if (contentType.includes('text/html')) {
+      return res.redirect(302, url);
+    }
+
     let ext = '';
     if (contentType.includes('video/mp4')) ext = '.mp4';
     else if (contentType.includes('video/quicktime')) ext = '.mov';

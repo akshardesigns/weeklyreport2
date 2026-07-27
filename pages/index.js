@@ -969,31 +969,42 @@ export default function Home() {
     }
   }
 
-  async function triggerAutoDownloadAndPlatformRedirect(brief, targetPlatform) {
+  function triggerAutoDownloadAndPlatformRedirect(brief, targetPlatform) {
     if (!brief) return;
     const mediaUrl = brief.hasilAkhir;
     if (mediaUrl) {
-      const isCloudFolder =
-        mediaUrl.includes('drive.google.com') ||
-        mediaUrl.includes('dropbox.com') ||
-        mediaUrl.includes('canva.com');
+      let downloadUrl = mediaUrl;
+      if (mediaUrl.includes('drive.google.com')) {
+        const match = mediaUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || mediaUrl.match(/id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+          downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+        }
+      }
 
-      if (isCloudFolder) {
+      const isFolder = mediaUrl.includes('/folders/');
+      if (isFolder) {
         window.open(mediaUrl, '_blank');
       } else {
         const cleanName = brief.brief ? brief.brief.replace(/[^a-z0-9]/gi, '_') : 'media_asset';
-        const downloadApiUrl = `/api/download?url=${encodeURIComponent(mediaUrl)}&filename=${encodeURIComponent(cleanName)}`;
-        const a = document.createElement('a');
-        a.href = downloadApiUrl;
-        a.download = `${cleanName}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        const proxyUrl = `/api/download?url=${encodeURIComponent(downloadUrl)}&filename=${encodeURIComponent(cleanName)}`;
+        
+        // Force direct browser download using hidden iframe trick
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = proxyUrl;
+        document.body.appendChild(iframe);
+        setTimeout(() => {
+          if (document.body.contains(iframe)) document.body.removeChild(iframe);
+        }, 15000);
       }
     }
-    const plat = (targetPlatform || platformsOf(brief)[0] || '').toLowerCase();
-    const dest = plat.includes('tiktok') || plat.includes('tok') ? 'https://www.tiktok.com' : 'https://www.instagram.com';
-    window.open(dest, '_blank');
+
+    // Open target platform in new tab after 600ms so download initiates first
+    setTimeout(() => {
+      const plat = (targetPlatform || platformsOf(brief)[0] || '').toLowerCase();
+      const dest = plat.includes('tiktok') || plat.includes('tok') ? 'https://www.tiktok.com' : 'https://www.instagram.com';
+      window.open(dest, '_blank');
+    }, 600);
   }
 
   async function updateBriefPostingDate(brief, targetPlatform, targetDate) {
