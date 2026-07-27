@@ -931,6 +931,12 @@ export default function Home() {
     setTimeout(() => setToastMsg(null), 5000);
   }
 
+  function getWANotifURL(brief) {
+    if (!brief) return 'https://wa.me/6285603524508';
+    const msg = `🔥 PENGINGAT POSTING!\n\n📌 Judul Brief: ${brief.brief || '-'}\n📱 Platform: ${platformLabel(brief)}\n🏷️ Pilar: ${brief.pilar || '-'}\n🗓️ Tanggal Posting: ${brief.tglPosting || '-'}\n\n🔗 Link Media: ${brief.hasilAkhir || '-'}`;
+    return `https://wa.me/6285603524508?text=${encodeURIComponent(msg)}`;
+  }
+
   const waAutoNotifiedRef = useRef(false);
 
   useEffect(() => {
