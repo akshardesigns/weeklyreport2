@@ -2010,6 +2010,17 @@ export default function Home() {
               </div>
 
               <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 6 }}>
+                  Status
+                </div>
+                <div>
+                  <span className={`pill ${pillClass(statusOf(selectedCalendarBrief.brief))}`} style={{ fontSize: 12.5, fontWeight: 600, padding: '4px 10px' }}>
+                    {statusOf(selectedCalendarBrief.brief)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
                   Sumber / Referensi
                 </div>
