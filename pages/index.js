@@ -1002,8 +1002,18 @@ export default function Home() {
     if (!brief) return;
     const mediaUrl = brief.hasilAkhir;
     if (mediaUrl) {
-      const cleanName = brief.brief ? brief.brief.replace(/[^a-z0-9]/gi, '_') : 'media_asset';
-      await forceDownloadFile(mediaUrl, `${cleanName}.mp4`);
+      const isCloudFolder =
+        mediaUrl.includes('drive.google.com') ||
+        mediaUrl.includes('dropbox.com') ||
+        mediaUrl.includes('canva.com');
+      const isDirectFile = /\.(mp4|mov|png|jpg|jpeg|webp|gif)(\?.*)?$/i.test(mediaUrl);
+
+      if (isDirectFile && !isCloudFolder) {
+        const cleanName = brief.brief ? brief.brief.replace(/[^a-z0-9]/gi, '_') : 'media_asset';
+        await forceDownloadFile(mediaUrl, `${cleanName}.mp4`);
+      } else {
+        window.open(mediaUrl, '_blank');
+      }
     }
     const plat = (targetPlatform || platformsOf(brief)[0] || '').toLowerCase();
     const dest = plat.includes('tiktok') || plat.includes('tok') ? 'https://www.tiktok.com' : 'https://www.instagram.com';
