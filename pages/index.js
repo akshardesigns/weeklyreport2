@@ -931,6 +931,44 @@ export default function Home() {
     setTimeout(() => setToastMsg(null), 5000);
   }
 
+  function getWANotifURL(brief) {
+    if (!brief) return 'https://wa.me/6285603524508';
+    const msg = `🔥 PENGINGAT POSTING HARI INI!\n\n📌 Judul Brief: ${brief.brief || '-'}\n📱 Platform: ${platformLabel(brief)}\n🏷️ Pilar: ${brief.pilar || '-'}\n🗓️ Tanggal Posting: ${brief.tglPosting || '-'}\n\n🔗 Link Media: ${brief.hasilAkhir || '-'}`;
+    return `https://wa.me/6285603524508?text=${encodeURIComponent(msg)}`;
+  }
+
+  function triggerAutoDownloadAndPlatformRedirect(brief, targetPlatform) {
+    if (!brief) return;
+    const mediaUrl = brief.hasilAkhir;
+    if (mediaUrl) {
+      try {
+        const a = document.createElement('a');
+        a.href = mediaUrl;
+        a.download = brief.brief ? `${brief.brief.replace(/[^a-z0-9]/gi, '_')}` : 'media_asset';
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (e) {
+        window.open(mediaUrl, '_blank');
+      }
+    }
+    const plat = (targetPlatform || platformsOf(brief)[0] || '').toLowerCase();
+    const dest = plat.includes('tiktok') || plat.includes('tok') ? 'https://www.tiktok.com' : 'https://www.instagram.com';
+    window.open(dest, '_blank');
+  }
+
+  const todayDueBriefs = useMemo(
+    () =>
+      briefs.filter(
+        (b) =>
+          b &&
+          String(b.tglPosting || '').includes(today) &&
+          statusOf(b) !== 'Selesai Terupload'
+      ),
+    [briefs, today]
+  );
+
   async function updateBriefPostingDate(brief, targetPlatform, targetDate) {
     const plats = platformsOf(brief);
     const pairs = platformDatePairs(brief);
@@ -1218,6 +1256,27 @@ export default function Home() {
             />
           </div>
           {importMsg && !importOpen && <p className="msg">{importMsg}</p>}
+
+          {todayDueBriefs.length > 0 && (
+            <div className="wa-alert-banner">
+              <div>
+                <div className="wa-alert-title">
+                  <span>🔥</span> Ada {todayDueBriefs.length} Brief Jadwal Posting Hari Ini!
+                </div>
+                <div className="wa-alert-desc">
+                  Kirim notifikasi otomatis ke WhatsApp <b>085603524508</b> untuk mengingatkan tim posting.
+                </div>
+              </div>
+              <a
+                href={getWANotifURL(todayDueBriefs[0])}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-wa"
+              >
+                💬 Kirim Notif WA ke 085603524508
+              </a>
+            </div>
+          )}
 
           <div className="calendar-grid">
             {DAY_LABELS.map((d) => (
@@ -2071,23 +2130,39 @@ export default function Home() {
                 🗑️ Hapus Brief
               </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {selectedCalendarBrief.brief && selectedCalendarBrief.brief.hasilAkhir && (
-                  <a
-                    href={selectedCalendarBrief.brief.hasilAkhir}
-                    target="_blank"
-                    rel="noopener noreferrer"
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <a
+                  href={getWANotifURL(selectedCalendarBrief.brief)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', fontSize: 13, fontWeight: 600, color: '#128C7E', borderColor: 'rgba(37,211,102,0.45)', textDecoration: 'none' }}
+                  title="Kirim Notifikasi WA ke 085603524508"
+                >
+                  💬 Notif WA
+                </a>
+
+                {selectedCalendarBrief.brief && (
+                  <button
+                    type="button"
                     className="btn btn-primary"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13.5, fontWeight: 600, textDecoration: 'none' }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13.5, fontWeight: 600 }}
+                    onClick={() => {
+                      triggerAutoDownloadAndPlatformRedirect(
+                        selectedCalendarBrief.brief,
+                        selectedCalendarBrief.platform
+                      );
+                    }}
+                    title="Download media & buka aplikasi platform"
                   >
-                    🎬 Buka Media
-                  </a>
+                    📥 Download &amp; Buka App
+                  </button>
                 )}
 
                 <button
                   type="button"
                   className="btn btn-outline"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13.5, fontWeight: 600 }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13.5, fontWeight: 600 }}
                   onClick={() => {
                     if (selectedCalendarBrief && selectedCalendarBrief.brief) {
                       const bId = selectedCalendarBrief.brief.id;
