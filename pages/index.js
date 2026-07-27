@@ -937,47 +937,18 @@ export default function Home() {
     return `https://wa.me/6285603524508?text=${encodeURIComponent(msg)}`;
   }
 
-  const waAutoNotifiedRef = useRef(false);
+  const [dismissedReminder, setDismissedReminder] = useState(false);
 
-  useEffect(() => {
-    if (!briefs || briefs.length === 0) return;
-    if (waAutoNotifiedRef.current) return;
-
-    const todayStr = todayISO();
-    const todayBriefs = briefs.filter(
-      (b) =>
-        b &&
-        String(b.tglPosting || '').includes(todayStr) &&
-        statusOf(b) !== 'Selesai Terupload'
-    );
-
-    if (todayBriefs.length > 0) {
-      waAutoNotifiedRef.current = true;
-      const lines = [
-        `🔥 PENGINGAT POSTING HARI INI (${fmtDate(todayStr)})!`,
-        ``,
-        `Terdapat ${todayBriefs.length} brief yang harus diunggah hari ini:`,
-        ``,
-      ];
-
-      todayBriefs.forEach((b, idx) => {
-        lines.push(`${idx + 1}. 📌 ${b.brief || '-'}`);
-        lines.push(`   📱 Platform: ${platformLabel(b)}`);
-        lines.push(`   🏷️ Pilar: ${b.pilar || '-'}`);
-        if (b.hasilAkhir) {
-          lines.push(`   🔗 Media: ${b.hasilAkhir}`);
-        }
-        lines.push(``);
-      });
-
-      const fullMessage = lines.join('\n');
-      const waUrl = `https://wa.me/6285603524508?text=${encodeURIComponent(fullMessage)}`;
-
-      setTimeout(() => {
-        window.open(waUrl, '_blank');
-      }, 1200);
-    }
-  }, [briefs]);
+  const todayDueBriefs = useMemo(
+    () =>
+      briefs.filter(
+        (b) =>
+          b &&
+          String(b.tglPosting || '').includes(today) &&
+          statusOf(b) !== 'Selesai Terupload'
+      ),
+    [briefs, today]
+  );
 
   async function forceDownloadFile(url, filename) {
     if (!url) return;
@@ -1307,6 +1278,42 @@ export default function Home() {
             />
           </div>
           {importMsg && !importOpen && <p className="msg">{importMsg}</p>}
+
+          {!dismissedReminder && todayDueBriefs.length > 0 && (
+            <div className="gcal-reminder-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div className="gcal-reminder-icon">⏰</div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
+                    Pengingat Posting Hari Ini ({todayDueBriefs.length} Brief Waktunya Diunggah)
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'var(--sub)', marginTop: 2 }}>
+                    {todayDueBriefs.map((b) => b.brief).join(' · ')}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <a
+                  href={getWANotifURL(todayDueBriefs[0])}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline btn-sm"
+                  style={{ color: '#128C7E', borderColor: 'rgba(37,211,102,0.45)', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, textDecoration: 'none' }}
+                >
+                  💬 Notif WA (085603524508)
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setDismissedReminder(true)}
+                  title="Tutup Pengingat"
+                  style={{ fontSize: 14, padding: '4px 8px' }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="calendar-grid">
             {DAY_LABELS.map((d) => (
