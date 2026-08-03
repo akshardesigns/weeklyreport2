@@ -22,10 +22,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: `Method ${req.method} tidak diizinkan` });
   } catch (err) {
     console.error('API /briefs/[id] error:', err);
-    if (err.message && err.message.includes('caller does not have permission')) {
+    if (err.message && (err.message.includes('caller does not have permission') || err.message.includes('storageQuotaExceeded'))) {
       const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || 'Service Account';
       return res.status(403).json({
-        error: `Izin Google Sheet Ditolak: Pastikan email Service Account (${email}) telah ditambahkan sebagai "Editor" pada dokumen Google Sheet Anda.`
+        error: `Izin Google Sheet / Storage Ditolak: Pastikan email Service Account (${email}) telah ditambahkan sebagai "Editor" DAN penyimpanan Google Drive Anda tidak penuh (100% Full Storage).`
       });
     }
     return res.status(500).json({ error: err.message || 'Terjadi kesalahan pada server' });
