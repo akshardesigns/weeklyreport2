@@ -1516,7 +1516,7 @@ export default function Home() {
       ) : (
         <>
           <div className="week-filter-panel">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sub)' }}>Filter Bulan:</span>
                 <select
@@ -1528,7 +1528,7 @@ export default function Home() {
                   style={{
                     fontSize: 13,
                     fontWeight: 700,
-                    padding: '6px 14px',
+                    padding: '7px 14px',
                     borderRadius: 10,
                     border: '1px solid var(--hair)',
                     background: 'var(--card)',
@@ -1546,43 +1546,34 @@ export default function Home() {
                 </select>
               </div>
 
-              <div className="week-filter">
-                <button
-                  className={`week-toggle${weekInMonthIndex !== null ? '' : ' is-off'}`}
-                  onClick={() => setWeekInMonthIndex(weekInMonthIndex === null ? 0 : null)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sub)' }}>Minggu Produksi:</span>
+                <select
+                  value={weekInMonthIndex === null ? 'all' : weekInMonthIndex}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setWeekInMonthIndex(val === 'all' ? null : Number(val));
+                  }}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    padding: '7px 14px',
+                    borderRadius: 10,
+                    border: '1px solid var(--hair)',
+                    background: 'var(--card)',
+                    color: 'var(--ink)',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
                 >
-                  {weekInMonthIndex !== null ? 'Filter: Mingguan' : 'Semua Minggu Bulan Ini'}
-                </button>
-                {weekInMonthIndex !== null && (
-                  <div className="week-nav">
-                    <button
-                      onClick={() => setWeekInMonthIndex(Math.max(0, weekInMonthIndex - 1))}
-                      disabled={weekInMonthIndex <= 0}
-                      title="Minggu sebelumnya"
-                    >
-                      ‹
-                    </button>
-                    <span className="week-label">
-                      {formatWeekInMonthLabel(currentMonthWeeks, weekInMonthIndex)}
-                    </span>
-                    <button
-                      onClick={() => setWeekInMonthIndex(Math.min(currentMonthWeeks.length - 1, weekInMonthIndex + 1))}
-                      disabled={weekInMonthIndex >= currentMonthWeeks.length - 1}
-                      title="Minggu berikutnya"
-                    >
-                      ›
-                    </button>
-                  </div>
-                )}
-                {weekInMonthIndex !== 0 && (
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setWeekInMonthIndex(0)}
-                    title="Ke Minggu 1"
-                  >
-                    Minggu 1
-                  </button>
-                )}
+                  <option value="all">Semua Minggu Bulan Ini</option>
+                  {currentMonthWeeks.map((w, idx) => (
+                    <option key={idx} value={idx}>
+                      {formatWeekInMonthLabel(currentMonthWeeks, idx)}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
