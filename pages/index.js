@@ -2281,9 +2281,9 @@ export default function Home() {
       )}
 
       {statusModal && (
-        <div className="modal-backdrop" onClick={() => setStatusModal(null)}>
+        <div className="modal-overlay" style={{ zIndex: 9999 }} onClick={() => setStatusModal(null)}>
           <div
-            className="modal-box"
+            className="modal-card"
             style={{ maxWidth: 850, width: '92%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2298,9 +2298,9 @@ export default function Home() {
               </div>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm"
+                className="modal-close"
                 onClick={() => setStatusModal(null)}
-                style={{ fontSize: 18, fontWeight: 700 }}
+                title="Tutup Modal"
               >
                 ✕
               </button>
