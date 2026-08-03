@@ -151,7 +151,7 @@ function pillClass(status) {
 
 // --- Helper minggu custom per bulan (Jumat - Kamis) ---
 const MONTH_OPTIONS = [
-  { value: '2026-5', label: 'Juni 2026' },
+  { value: 'all', label: 'Semua Bulan (2026)' },
   { value: '2026-6', label: 'Juli 2026' },
   { value: '2026-7', label: 'Agustus 2026' },
   { value: '2026-8', label: 'September 2026' },
@@ -603,14 +603,12 @@ export default function Home() {
     loadBriefs();
   }, []);
 
-  const [selectedDashboardMonth, setSelectedDashboardMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${d.getMonth()}`;
-  });
+  const [selectedDashboardMonth, setSelectedDashboardMonth] = useState('2026-6');
   const [weekInMonthIndex, setWeekInMonthIndex] = useState(0);
 
   const currentMonthWeeks = useMemo(() => {
-    const parts = (selectedDashboardMonth || '2026-7').split('-').map(Number);
+    if (!selectedDashboardMonth || selectedDashboardMonth === 'all') return [];
+    const parts = selectedDashboardMonth.split('-').map(Number);
     return getWeeksForMonth(parts[0], parts[1]);
   }, [selectedDashboardMonth]);
 
@@ -621,6 +619,11 @@ export default function Home() {
 
   const filteredBriefs = useMemo(() => {
     const list = briefs.filter((b) => !isReferenceBrief(b));
+
+    if (selectedDashboardMonth === 'all') {
+      return list;
+    }
+
     if (!activeWeekRange) {
       if (!currentMonthWeeks || currentMonthWeeks.length === 0) return list;
       const monthStart = currentMonthWeeks[0].start;
@@ -631,12 +634,13 @@ export default function Home() {
         return d >= monthStart && d <= monthEnd;
       });
     }
+
     return list.filter((b) => {
       if (!b.tglMasuk) return false;
       const d = parseISODate(b.tglMasuk);
       return d >= activeWeekRange.start && d <= activeWeekRange.end;
     });
-  }, [briefs, activeWeekRange, currentMonthWeeks]);
+  }, [briefs, activeWeekRange, currentMonthWeeks, selectedDashboardMonth]);
 
   // brief selesai, dikelompokkan per tanggal selesai (turun dari yang paling baru)
   const dailyCompleted = useMemo(() => {
@@ -1551,7 +1555,8 @@ export default function Home() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sub)' }}>Minggu Produksi:</span>
                 <select
-                  value={weekInMonthIndex === null ? 'all' : weekInMonthIndex}
+                  value={selectedDashboardMonth === 'all' ? 'all' : (weekInMonthIndex === null ? 'all' : weekInMonthIndex)}
+                  disabled={selectedDashboardMonth === 'all'}
                   onChange={(e) => {
                     const val = e.target.value;
                     setWeekInMonthIndex(val === 'all' ? null : Number(val));
@@ -1564,12 +1569,15 @@ export default function Home() {
                     border: '1px solid var(--hair)',
                     background: 'var(--card)',
                     color: 'var(--ink)',
-                    cursor: 'pointer',
+                    cursor: selectedDashboardMonth === 'all' ? 'not-allowed' : 'pointer',
+                    opacity: selectedDashboardMonth === 'all' ? 0.6 : 1,
                     outline: 'none',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                   }}
                 >
-                  <option value="all">Semua Minggu Bulan Ini</option>
+                  <option value="all">
+                    {selectedDashboardMonth === 'all' ? 'Semua Minggu (Sepanjang Tahun)' : 'Semua Minggu Bulan Ini'}
+                  </option>
                   {currentMonthWeeks.map((w, idx) => (
                     <option key={idx} value={idx}>
                       {formatWeekInMonthLabel(currentMonthWeeks, idx)}
