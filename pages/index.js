@@ -841,11 +841,25 @@ export default function Home() {
   const briefsForModal = useMemo(() => {
     if (!statusModal) return [];
     if (statusModal === 'Total Brief') return filteredBriefs;
-    return filteredBriefs.filter((b) => statusOf(b) === statusModal);
+    const target = statusModal.trim().toLowerCase();
+    return filteredBriefs.filter((b) => {
+      const s = (statusOf(b) || '').trim().toLowerCase();
+      if (target === 'belum dikerjakan') {
+        return s === 'belum dikerjakan' || s === 'drafting brief' || !b.status;
+      }
+      return s === target;
+    });
   }, [statusModal, filteredBriefs]);
 
   function handleStatusCardClick(statusName) {
     setStatusModal(statusName);
+  }
+
+  function handleCardClickOrDoubleClick(e, label) {
+    if (e) {
+      e.stopPropagation();
+    }
+    setStatusModal(label);
   }
 
   const total = filteredBriefs.length;
@@ -1486,11 +1500,17 @@ export default function Home() {
                 <div
                   className="kpi clickable"
                   key={c.label}
-                  onClick={() => handleStatusCardClick(c.label)}
-                  onDoubleClick={() => handleStatusCardClick(c.label)}
-                  title={`Klik / Double klik untuk membuka pop-up brief ${c.label}`}
+                  onClick={(e) => handleCardClickOrDoubleClick(e, c.label)}
+                  onDoubleClick={(e) => handleCardClickOrDoubleClick(e, c.label)}
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  title={`Klik / Double click untuk melihat daftar brief ${c.label}`}
                 >
-                  <div className="label">{c.label}</div>
+                  <div className="label">
+                    {c.label}
+                    <span style={{ fontSize: 9, opacity: 0.75, display: 'block', fontWeight: 500, marginTop: 2, color: 'var(--blue)' }}>
+                      🔍 Klik untuk rincian
+                    </span>
+                  </div>
                   <div className="value" style={{ color: c.color }}>{c.value}</div>
                 </div>
               );
@@ -1509,8 +1529,9 @@ export default function Home() {
                     <div
                       className="bar-row clickable"
                       key={s.name}
-                      onClick={() => handleStatusCardClick(s.name)}
-                      onDoubleClick={() => handleStatusCardClick(s.name)}
+                      onClick={(e) => handleCardClickOrDoubleClick(e, s.name)}
+                      onDoubleClick={(e) => handleCardClickOrDoubleClick(e, s.name)}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
                       title={`Klik / Double klik untuk membuka pop-up status ${s.name}`}
                     >
                       <div className="name" style={{ fontWeight: isSelected ? 700 : 500 }}>{s.name}</div>
