@@ -836,6 +836,20 @@ export default function Home() {
   }
 
   // ------ Turunan untuk KPI / chart (berdasarkan data yang sudah difilter minggu) ------
+  function handleStatusCardClick(statusName) {
+    if (statusName === 'Total Brief') {
+      setFilterStatus('');
+    } else {
+      setFilterStatus(statusName);
+    }
+    setTimeout(() => {
+      const tableElem = document.getElementById('table-panel');
+      if (tableElem) {
+        tableElem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+  }
+
   const total = filteredBriefs.length;
   const countStatus = (s) => filteredBriefs.filter((b) => statusOf(b) === s).length;
   const statuses = [
@@ -1470,19 +1484,17 @@ export default function Home() {
 
           <div className="kpi-grid">
             {kpiCards.map((c) => {
-              const clickable = c.label === 'Selesai Terupload';
+              const isActive = (c.label === 'Total Brief' && !filterStatus) || filterStatus === c.label;
               return (
                 <div
-                  className={`kpi${clickable ? ' clickable' : ''}`}
+                  className={`kpi clickable${isActive ? ' is-active' : ''}`}
                   key={c.label}
-                  onClick={
-                    clickable
-                      ? () => document.getElementById('daily-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                      : undefined
-                  }
-                  title={clickable ? 'Lihat rincian per hari' : undefined}
+                  onClick={() => handleStatusCardClick(c.label)}
+                  title={`Klik untuk melihat daftar brief ${c.label}`}
                 >
-                  <div className="label">{c.label}</div>
+                  <div className="label">
+                    {c.label} {isActive && <span style={{ fontSize: 9.5, background: 'var(--blue)', color: '#fff', padding: '1px 5px', borderRadius: 4, marginLeft: 4, fontWeight: 700 }}>AKTIF</span>}
+                  </div>
                   <div className="value" style={{ color: c.color }}>{c.value}</div>
                 </div>
               );
@@ -1496,9 +1508,16 @@ export default function Home() {
                 {statuses.map((s) => {
                   const n = countStatus(s.name);
                   const pct = ((n / maxStatus) * 100).toFixed(0);
+                  const isSelected = filterStatus === s.name;
                   return (
-                    <div className="bar-row" key={s.name}>
-                      <div className="name">{s.name}</div>
+                    <div
+                      className="bar-row clickable"
+                      key={s.name}
+                      onClick={() => handleStatusCardClick(s.name)}
+                      title={`Klik untuk filter status ${s.name}`}
+                      style={{ background: isSelected ? 'rgba(0,113,227,0.08)' : undefined }}
+                    >
+                      <div className="name" style={{ fontWeight: isSelected ? 700 : 500 }}>{s.name}</div>
                       <div className="bar-track">
                         <div className="bar-fill" style={{ width: pct + '%', background: s.color }} />
                       </div>
@@ -1585,9 +1604,22 @@ export default function Home() {
             )}
           </div>
 
-          <div className="list-panel">
-            <div className="list-head">
+          <div className="list-panel" id="table-panel">
+            <div className="list-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3>Daftar Brief</h3>
+              {filterStatus && (
+                <span style={{ fontSize: 12.5, background: 'rgba(0,113,227,0.1)', color: 'var(--blue)', padding: '4px 12px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+                  Menampilkan: <b>{filterStatus}</b> ({sortedBriefs.length} brief)
+                  <button
+                    type="button"
+                    onClick={() => setFilterStatus('')}
+                    style={{ border: 'none', background: 'none', color: 'var(--blue)', cursor: 'pointer', fontWeight: 700, marginLeft: 4 }}
+                    title="Tampilkan Semua Brief"
+                  >
+                    ✕ Clear
+                  </button>
+                </span>
+              )}
             </div>
 
             <div className="table-filters">
