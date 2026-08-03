@@ -836,18 +836,16 @@ export default function Home() {
   }
 
   // ------ Turunan untuk KPI / chart (berdasarkan data yang sudah difilter minggu) ------
+  const [statusModal, setStatusModal] = useState(null);
+
+  const briefsForModal = useMemo(() => {
+    if (!statusModal) return [];
+    if (statusModal === 'Total Brief') return filteredBriefs;
+    return filteredBriefs.filter((b) => statusOf(b) === statusModal);
+  }, [statusModal, filteredBriefs]);
+
   function handleStatusCardClick(statusName) {
-    if (statusName === 'Total Brief') {
-      setFilterStatus('');
-    } else {
-      setFilterStatus(statusName);
-    }
-    setTimeout(() => {
-      const tableElem = document.getElementById('table-panel');
-      if (tableElem) {
-        tableElem.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 50);
+    setStatusModal(statusName);
   }
 
   const total = filteredBriefs.length;
@@ -1484,17 +1482,15 @@ export default function Home() {
 
           <div className="kpi-grid">
             {kpiCards.map((c) => {
-              const isActive = (c.label === 'Total Brief' && !filterStatus) || filterStatus === c.label;
               return (
                 <div
-                  className={`kpi clickable${isActive ? ' is-active' : ''}`}
+                  className="kpi clickable"
                   key={c.label}
                   onClick={() => handleStatusCardClick(c.label)}
-                  title={`Klik untuk melihat daftar brief ${c.label}`}
+                  onDoubleClick={() => handleStatusCardClick(c.label)}
+                  title={`Klik / Double klik untuk membuka pop-up brief ${c.label}`}
                 >
-                  <div className="label">
-                    {c.label} {isActive && <span style={{ fontSize: 9.5, background: 'var(--blue)', color: '#fff', padding: '1px 5px', borderRadius: 4, marginLeft: 4, fontWeight: 700 }}>AKTIF</span>}
-                  </div>
+                  <div className="label">{c.label}</div>
                   <div className="value" style={{ color: c.color }}>{c.value}</div>
                 </div>
               );
@@ -1514,8 +1510,8 @@ export default function Home() {
                       className="bar-row clickable"
                       key={s.name}
                       onClick={() => handleStatusCardClick(s.name)}
-                      title={`Klik untuk filter status ${s.name}`}
-                      style={{ background: isSelected ? 'rgba(0,113,227,0.08)' : undefined }}
+                      onDoubleClick={() => handleStatusCardClick(s.name)}
+                      title={`Klik / Double klik untuk membuka pop-up status ${s.name}`}
                     >
                       <div className="name" style={{ fontWeight: isSelected ? 700 : 500 }}>{s.name}</div>
                       <div className="bar-track">
@@ -2258,6 +2254,105 @@ export default function Home() {
                   ✏️ Edit Brief
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {statusModal && (
+        <div className="modal-backdrop" onClick={() => setStatusModal(null)}>
+          <div
+            className="modal-box"
+            style={{ maxWidth: 850, width: '92%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, borderBottom: '1px solid var(--hair)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>
+                  Daftar Brief Status: {statusModal}
+                </h3>
+                <span className={`pill ${pillClass(statusModal)}`} style={{ fontSize: 12 }}>
+                  {briefsForModal.length} Brief
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setStatusModal(null)}
+                style={{ fontSize: 18, fontWeight: 700 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, paddingTop: 16, paddingBottom: 16 }}>
+              {briefsForModal.length === 0 ? (
+                <div className="empty">Tidak ada brief dengan status "{statusModal}".</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {briefsForModal.map((b) => (
+                    <div
+                      key={b.id}
+                      style={{
+                        background: 'var(--bg)',
+                        border: '1px solid var(--hair)',
+                        borderRadius: 12,
+                        padding: '14px 18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 16,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ flex: '1 1 280px' }}>
+                        <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--ink)', marginBottom: 4 }}>
+                          {b.brief}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span className="tag">{b.pilar}</span>
+                          <span className="tag">{platformLabel(b)}</span>
+                          <span style={{ fontSize: 12, color: 'var(--sub)', marginLeft: 4 }}>
+                            🗓️ Posting: {b.tglPosting || 'Belum dijadwalkan'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {b.hasilAkhir && (
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            onClick={() => triggerAutoDownloadAndPlatformRedirect(b, platformsOf(b)[0])}
+                          >
+                            {b.hasilAkhir.includes('/folders/') ? '📂 Drive' : '📥 Media'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => {
+                            setStatusModal(null);
+                            enterEditMode(b.id);
+                          }}
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          style={{ color: 'var(--red)', borderColor: 'rgba(255,59,48,0.3)' }}
+                          onClick={() => {
+                            handleDelete(b.id);
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
