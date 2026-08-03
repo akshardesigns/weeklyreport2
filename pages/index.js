@@ -149,12 +149,16 @@ function pillClass(status) {
   return map[status] || 'pill-grey';
 }
 
-// --- Helper minggu custom ---
-// Minggu 1 (index 0) = minggu pertama kerja, range-nya tidak genap 7 hari: 29 Jun - 9 Jul.
-// Minggu 2 dst (index 1, 2, ...) = blok 7 hari berturut-turut mulai 10 Jul, mengikuti
-// jadwal weekly report tiap hari Kamis (Jumat - Kamis).
-const WEEK1_START = '2026-07-01';
-const WEEK1_END = '2026-07-09';
+// --- Helper minggu custom per bulan (Jumat - Kamis) ---
+const MONTH_OPTIONS = [
+  { value: '2026-5', label: 'Juni 2026' },
+  { value: '2026-6', label: 'Juli 2026' },
+  { value: '2026-7', label: 'Agustus 2026' },
+  { value: '2026-8', label: 'September 2026' },
+  { value: '2026-9', label: 'Oktober 2026' },
+  { value: '2026-10', label: 'November 2026' },
+  { value: '2026-11', label: 'Desember 2026' },
+];
 
 function addDays(date, n) {
   const d = new Date(date);
@@ -170,42 +174,51 @@ function toISO(d) {
 function parseISODate(s) {
   return new Date(s + 'T00:00:00');
 }
-// Mengembalikan { start, end } (Date, inclusive) untuk index minggu ke-n (0-based).
-function getWeekRange(weekIndex) {
-  const week1Start = parseISODate(WEEK1_START);
-  const week1End = parseISODate(WEEK1_END);
-  if (weekIndex <= 0) {
-    return { start: week1Start, end: week1End };
+
+function getWeeksForMonth(year, monthIndex) {
+  // Khusus Juli 2026
+  if (year === 2026 && monthIndex === 6) {
+    return [
+      { weekNum: 1, start: parseISODate('2026-07-01'), end: parseISODate('2026-07-09') },
+      { weekNum: 2, start: parseISODate('2026-07-10'), end: parseISODate('2026-07-16') },
+      { weekNum: 3, start: parseISODate('2026-07-17'), end: parseISODate('2026-07-23') },
+      { weekNum: 4, start: parseISODate('2026-07-24'), end: parseISODate('2026-07-30') },
+      { weekNum: 5, start: parseISODate('2026-07-31'), end: parseISODate('2026-08-06') },
+    ];
   }
-  const week2Start = addDays(week1End, 1); // 10 Jul
-  const start = addDays(week2Start, (weekIndex - 1) * 7);
-  const end = addDays(start, 6);
-  return { start, end };
+
+  // Siklus Jumat - Kamis untuk bulan lainnya (misal Agustus: 31 Jul - 06 Agu = Minggu 1)
+  const firstOfMonth = new Date(year, monthIndex, 1);
+  let d = new Date(firstOfMonth);
+  let dayOfWeek = d.getDay(); // 0=Sun, 5=Fri
+  let diffToFri = (dayOfWeek - 5 + 7) % 7;
+  d.setDate(d.getDate() - diffToFri);
+
+  const weeks = [];
+  let weekNum = 1;
+  while (true) {
+    const wStart = new Date(d);
+    const wEnd = addDays(wStart, 6);
+    if (wStart.getMonth() === monthIndex || wEnd.getMonth() === monthIndex) {
+      weeks.push({ weekNum, start: wStart, end: wEnd });
+      weekNum++;
+    } else if (wStart.getMonth() > monthIndex || wStart.getFullYear() > year) {
+      break;
+    }
+    d = addDays(d, 7);
+  }
+  return weeks;
 }
-function formatWeekLabel(weekIndex) {
-  const { start, end } = getWeekRange(weekIndex);
+
+function formatWeekInMonthLabel(weeks, idx) {
+  if (!weeks || !weeks[idx]) return '';
+  const { weekNum, start, end } = weeks[idx];
   const sameMonth = start.getMonth() === end.getMonth();
   const optsShort = { day: '2-digit' };
   const optsFull = { day: '2-digit', month: 'short', year: 'numeric' };
   const startLabel = start.toLocaleDateString('id-ID', sameMonth ? optsShort : optsFull);
   const endLabel = end.toLocaleDateString('id-ID', optsFull);
-  return `Minggu ${weekIndex + 1} · ${startLabel} - ${endLabel}`;
-}
-function isInWeek(isoDateStr, weekIndex) {
-  if (!isoDateStr) return false;
-  const d = parseISODate(isoDateStr);
-  const { start, end } = getWeekRange(weekIndex);
-  return d >= start && d <= end;
-}
-// Menentukan index minggu yang memuat tanggal hari ini.
-function currentWeekIndex() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const week1End = parseISODate(WEEK1_END);
-  if (today <= week1End) return 0;
-  const week2Start = addDays(week1End, 1);
-  const diffDays = Math.round((today - week2Start) / 86400000);
-  return 1 + Math.floor(diffDays / 7);
+  return `Minggu ${weekNum} · ${startLabel} - ${endLabel}`;
 }
 
 // --- Helper kalender bulanan (Kalender Konten, berbasis tglPosting) ---
@@ -595,11 +608,38 @@ export default function Home() {
     loadBriefs();
   }, []);
 
+  const [selectedDashboardMonth, setSelectedDashboardMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${d.getMonth()}`;
+  });
+  const [weekInMonthIndex, setWeekInMonthIndex] = useState(0);
+
+  const currentMonthWeeks = useMemo(() => {
+    const parts = (selectedDashboardMonth || '2026-7').split('-').map(Number);
+    return getWeeksForMonth(parts[0], parts[1]);
+  }, [selectedDashboardMonth]);
+
+  const activeWeekRange = useMemo(() => {
+    if (weekInMonthIndex === null || weekInMonthIndex >= currentMonthWeeks.length) return null;
+    return currentMonthWeeks[weekInMonthIndex];
+  }, [weekInMonthIndex, currentMonthWeeks]);
+
   const filteredBriefs = useMemo(() => {
     const list = briefs.filter((b) => !isReferenceBrief(b));
-    if (weekFilter === null) return list;
-    return list.filter((b) => isInWeek(b.tglMasuk, weekFilter));
-  }, [briefs, weekFilter]);
+    if (!activeWeekRange) {
+      const parts = (selectedDashboardMonth || '2026-7').split('-').map(Number);
+      return list.filter((b) => {
+        if (!b.tglMasuk) return false;
+        const d = parseISODate(b.tglMasuk);
+        return d.getFullYear() === parts[0] && d.getMonth() === parts[1];
+      });
+    }
+    return list.filter((b) => {
+      if (!b.tglMasuk) return false;
+      const d = parseISODate(b.tglMasuk);
+      return d >= activeWeekRange.start && d <= activeWeekRange.end;
+    });
+  }, [briefs, activeWeekRange, selectedDashboardMonth]);
 
   // brief selesai, dikelompokkan per tanggal selesai (turun dari yang paling baru)
   const dailyCompleted = useMemo(() => {
@@ -1481,26 +1521,74 @@ export default function Home() {
       ) : (
         <>
           <div className="week-filter-panel">
-            <div className="week-filter-panel-label">Filter Minggu Produksi</div>
-            <div className="week-filter">
-              <button
-                className={`week-toggle${weekFilter ? '' : ' is-off'}`}
-                onClick={() => setWeekFilter(weekFilter === null ? currentWeekIndex() : null)}
-              >
-                {weekFilter ? 'Filter: Mingguan' : 'Semua Minggu'}
-              </button>
-              {weekFilter !== null && (
-                <div className="week-nav">
-                  <button onClick={() => setWeekFilter(Math.max(0, weekFilter - 1))} title="Minggu sebelumnya">‹</button>
-                  <span className="week-label">{formatWeekLabel(weekFilter)}</span>
-                  <button onClick={() => setWeekFilter(weekFilter + 1)} title="Minggu berikutnya">›</button>
-                </div>
-              )}
-              {weekFilter !== null && weekFilter !== currentWeekIndex() && (
-                <button className="btn btn-ghost btn-sm" onClick={() => setWeekFilter(currentWeekIndex())}>
-                  Minggu Ini
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sub)' }}>Filter Bulan:</span>
+                <select
+                  value={selectedDashboardMonth}
+                  onChange={(e) => {
+                    setSelectedDashboardMonth(e.target.value);
+                    setWeekInMonthIndex(0);
+                  }}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    padding: '6px 14px',
+                    borderRadius: 10,
+                    border: '1px solid var(--hair)',
+                    background: 'var(--card)',
+                    color: 'var(--ink)',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  {MONTH_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="week-filter">
+                <button
+                  className={`week-toggle${weekInMonthIndex !== null ? '' : ' is-off'}`}
+                  onClick={() => setWeekInMonthIndex(weekInMonthIndex === null ? 0 : null)}
+                >
+                  {weekInMonthIndex !== null ? 'Filter: Mingguan' : 'Semua Minggu Bulan Ini'}
                 </button>
-              )}
+                {weekInMonthIndex !== null && (
+                  <div className="week-nav">
+                    <button
+                      onClick={() => setWeekInMonthIndex(Math.max(0, weekInMonthIndex - 1))}
+                      disabled={weekInMonthIndex <= 0}
+                      title="Minggu sebelumnya"
+                    >
+                      ‹
+                    </button>
+                    <span className="week-label">
+                      {formatWeekInMonthLabel(currentMonthWeeks, weekInMonthIndex)}
+                    </span>
+                    <button
+                      onClick={() => setWeekInMonthIndex(Math.min(currentMonthWeeks.length - 1, weekInMonthIndex + 1))}
+                      disabled={weekInMonthIndex >= currentMonthWeeks.length - 1}
+                      title="Minggu berikutnya"
+                    >
+                      ›
+                    </button>
+                  </div>
+                )}
+                {weekInMonthIndex !== 0 && (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setWeekInMonthIndex(0)}
+                    title="Ke Minggu 1"
+                  >
+                    Minggu 1
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
