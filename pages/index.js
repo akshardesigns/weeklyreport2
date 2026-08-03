@@ -995,6 +995,11 @@ export default function Home() {
   const unscheduledBriefs = useMemo(
     () =>
       briefs
+        .filter((b) => !isReferenceBrief(b))
+        .filter((b) => {
+          const pilarLower = (b.pilar || '').trim().toLowerCase();
+          return pilarLower !== 'ads' && pilarLower !== 'non sosmed';
+        })
         .filter((b) => platformDatePairs(b).every((pr) => !pr.date))
         .sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk)),
     [briefs]
