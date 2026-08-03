@@ -176,18 +176,17 @@ function parseISODate(s) {
 }
 
 function getWeeksForMonth(year, monthIndex) {
-  // Khusus Juli 2026
+  // Khusus Juli 2026 (Max 4 Minggu)
   if (year === 2026 && monthIndex === 6) {
     return [
       { weekNum: 1, start: parseISODate('2026-07-01'), end: parseISODate('2026-07-09') },
       { weekNum: 2, start: parseISODate('2026-07-10'), end: parseISODate('2026-07-16') },
       { weekNum: 3, start: parseISODate('2026-07-17'), end: parseISODate('2026-07-23') },
       { weekNum: 4, start: parseISODate('2026-07-24'), end: parseISODate('2026-07-30') },
-      { weekNum: 5, start: parseISODate('2026-07-31'), end: parseISODate('2026-08-06') },
     ];
   }
 
-  // Siklus Jumat - Kamis untuk bulan lainnya (misal Agustus: 31 Jul - 06 Agu = Minggu 1)
+  // Siklus Jumat - Kamis untuk bulan lainnya (Maksimal 4 Minggu)
   const firstOfMonth = new Date(year, monthIndex, 1);
   let d = new Date(firstOfMonth);
   let dayOfWeek = d.getDay(); // 0=Sun, 5=Fri
@@ -196,15 +195,11 @@ function getWeeksForMonth(year, monthIndex) {
 
   const weeks = [];
   let weekNum = 1;
-  while (true) {
+  while (weekNum <= 4) {
     const wStart = new Date(d);
     const wEnd = addDays(wStart, 6);
-    if (wStart.getMonth() === monthIndex || wEnd.getMonth() === monthIndex) {
-      weeks.push({ weekNum, start: wStart, end: wEnd });
-      weekNum++;
-    } else if (wStart.getMonth() > monthIndex || wStart.getFullYear() > year) {
-      break;
-    }
+    weeks.push({ weekNum, start: wStart, end: wEnd });
+    weekNum++;
     d = addDays(d, 7);
   }
   return weeks;
