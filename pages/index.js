@@ -851,6 +851,16 @@ export default function Home() {
     });
   }, [statusModal, filteredBriefs]);
 
+  const pilarBreakdownForModal = useMemo(() => {
+    if (!briefsForModal || briefsForModal.length === 0) return [];
+    const counts = {};
+    briefsForModal.forEach((b) => {
+      const p = b.pilar || 'Lainnya';
+      counts[p] = (counts[p] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [briefsForModal]);
+
   function handleStatusCardClick(statusName) {
     setStatusModal(statusName);
   }
@@ -2305,6 +2315,36 @@ export default function Home() {
                 ✕
               </button>
             </div>
+
+            {pilarBreakdownForModal.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, padding: '10px 14px', background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--hair)' }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--sub)' }}>Rincian Pilar:</span>
+                {pilarBreakdownForModal.map(([pilarName, count]) => {
+                  const pColor = pilarColors[pilarName] || '#0071e3';
+                  return (
+                    <span
+                      key={pilarName}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: '3px 10px',
+                        borderRadius: 20,
+                        background: 'var(--card)',
+                        color: 'var(--ink)',
+                        border: `1px solid ${pColor}`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      }}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: pColor, display: 'inline-block' }} />
+                      <b>{count}</b> {pilarName}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
 
             <div style={{ overflowY: 'auto', flex: 1, paddingTop: 16, paddingBottom: 16 }}>
               {briefsForModal.length === 0 ? (
