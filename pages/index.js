@@ -998,7 +998,7 @@ export default function Home() {
         .filter((b) => !isReferenceBrief(b))
         .filter((b) => {
           const pilarLower = (b.pilar || '').trim().toLowerCase();
-          return pilarLower !== 'ads' && pilarLower !== 'non sosmed';
+          return pilarLower !== 'ads' && pilarLower !== 'lainnya';
         })
         .filter((b) => platformDatePairs(b).every((pr) => !pr.date))
         .sort((a, b) => new Date(b.tglMasuk) - new Date(a.tglMasuk)),
