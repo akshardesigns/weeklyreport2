@@ -622,11 +622,13 @@ export default function Home() {
   const filteredBriefs = useMemo(() => {
     const list = briefs.filter((b) => !isReferenceBrief(b));
     if (!activeWeekRange) {
-      const parts = (selectedDashboardMonth || '2026-7').split('-').map(Number);
+      if (!currentMonthWeeks || currentMonthWeeks.length === 0) return list;
+      const monthStart = currentMonthWeeks[0].start;
+      const monthEnd = currentMonthWeeks[currentMonthWeeks.length - 1].end;
       return list.filter((b) => {
         if (!b.tglMasuk) return false;
         const d = parseISODate(b.tglMasuk);
-        return d.getFullYear() === parts[0] && d.getMonth() === parts[1];
+        return d >= monthStart && d <= monthEnd;
       });
     }
     return list.filter((b) => {
@@ -634,7 +636,7 @@ export default function Home() {
       const d = parseISODate(b.tglMasuk);
       return d >= activeWeekRange.start && d <= activeWeekRange.end;
     });
-  }, [briefs, activeWeekRange, selectedDashboardMonth]);
+  }, [briefs, activeWeekRange, currentMonthWeeks]);
 
   // brief selesai, dikelompokkan per tanggal selesai (turun dari yang paling baru)
   const dailyCompleted = useMemo(() => {
