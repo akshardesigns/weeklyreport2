@@ -125,15 +125,34 @@ function fmtDateShort(d) {
   if (isNaN(dt)) return '-';
   return dt.toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short' });
 }
-function maxDays(pilar) {
-  return pilar === 'Ads' || pilar === 'Carousel' ? 2 : 3;
+function getWeekRangeForDate(isoDateStr) {
+  if (!isoDateStr) return null;
+  const d = parseISODate(isoDateStr);
+  const dayOfWeek = d.getDay();
+  const diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const start = addDays(d, -diffToMon);
+  const end = addDays(start, 6);
+  return { start, end };
 }
+
 function kpiFor(b) {
-  if (!b || !b.tglSelesai || !b.tglMasuk) return null;
-  const start = new Date(b.tglMasuk + 'T00:00:00');
-  const end = new Date(b.tglSelesai + 'T00:00:00');
-  const diffDays = Math.round((end - start) / 86400000);
-  return diffDays <= maxDays(b.pilar) ? 'On Time' : 'Late';
+  if (!b || !b.tglMasuk) return null;
+  const weekRange = getWeekRangeForDate(b.tglMasuk);
+  if (!weekRange) return null;
+
+  if (statusOf(b) === 'Selesai Terupload') {
+    if (!b.tglSelesai) return 'On Time';
+    const selesaiDate = parseISODate(b.tglSelesai);
+    return selesaiDate <= weekRange.end ? 'On Time' : 'Late';
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (today > weekRange.end) {
+    return 'Late';
+  }
+
+  return 'Belum Selesai';
 }
 function statusOf(b) {
   if (!b) return 'Belum Dikerjakan';
@@ -176,22 +195,13 @@ function parseISODate(s) {
 }
 
 function getWeeksForMonth(year, monthIndex) {
-  // Khusus Juli 2026 (Max 4 Minggu)
-  if (year === 2026 && monthIndex === 6) {
-    return [
-      { weekNum: 1, start: parseISODate('2026-07-01'), end: parseISODate('2026-07-09') },
-      { weekNum: 2, start: parseISODate('2026-07-10'), end: parseISODate('2026-07-16') },
-      { weekNum: 3, start: parseISODate('2026-07-17'), end: parseISODate('2026-07-23') },
-      { weekNum: 4, start: parseISODate('2026-07-24'), end: parseISODate('2026-07-30') },
-    ];
-  }
-
-  // Siklus Jumat - Kamis untuk bulan lainnya (Maksimal 4 Minggu)
+  // Siklus mingguan: Senin - Minggu (Maksimal 4 Minggu per bulan)
+  // Contoh W1 Agustus 2026: 27 Juli - 02 Agustus 2026
   const firstOfMonth = new Date(year, monthIndex, 1);
   let d = new Date(firstOfMonth);
-  let dayOfWeek = d.getDay(); // 0=Sun, 5=Fri
-  let diffToFri = (dayOfWeek - 5 + 7) % 7;
-  d.setDate(d.getDate() - diffToFri);
+  let dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  let diffToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  d.setDate(d.getDate() - diffToMon);
 
   const weeks = [];
   let weekNum = 1;
