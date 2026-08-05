@@ -143,10 +143,12 @@ function kpiFor(b) {
   if (!weekRange) return null;
 
   const st = statusOf(b);
+  // Ketepatan Waktu dihitung dari Tanggal Upload File (b.tglSelesai):
+  // Brief masuk minggu ini wajib terupload (File Terupload) di minggu yang sama (maksimal hari Minggu).
   if (st === 'File Terupload' || st === 'Selesai Terupload') {
     if (!b.tglSelesai) return 'On Time';
-    const selesaiDate = parseISODate(b.tglSelesai);
-    return selesaiDate <= weekRange.end ? 'On Time' : 'Late';
+    const uploadFileDate = parseISODate(b.tglSelesai); // Tanggal Upload File
+    return uploadFileDate <= weekRange.end ? 'On Time' : 'Late';
   }
 
   const today = new Date();
