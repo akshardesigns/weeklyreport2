@@ -139,25 +139,19 @@ function getWeekRangeForDate(isoDateStr) {
 
 function kpiFor(b) {
   if (!b || !b.tglMasuk) return null;
-  const weekRange = getWeekRangeForDate(b.tglMasuk);
-  if (!weekRange) return null;
-
   const st = statusOf(b);
-  // Ketepatan Waktu dihitung dari Tanggal Upload File (b.tglSelesai):
-  // Brief masuk minggu ini wajib terupload (File Terupload) di minggu yang sama (maksimal hari Minggu).
+
+  // Ketepatan Waktu HANYA dihitung jika status sudah "File Terupload" (dan memiliki Tanggal Upload File)
   if (st === 'File Terupload' || st === 'Selesai Terupload') {
-    if (!b.tglSelesai) return 'On Time';
-    const uploadFileDate = parseISODate(b.tglSelesai); // Tanggal Upload File
+    if (!b.tglSelesai) return null;
+    const weekRange = getWeekRangeForDate(b.tglMasuk);
+    if (!weekRange) return null;
+    const uploadFileDate = parseISODate(b.tglSelesai);
     return uploadFileDate <= weekRange.end ? 'On Time' : 'Late';
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (today > weekRange.end) {
-    return 'Late';
-  }
-
-  return 'Belum Selesai';
+  // Jika status masih Waiting Approval / On Going / Belum Dikerjakan, KPI belum dihitung (Belum)
+  return null;
 }
 function statusOf(b) {
   if (!b) return 'Belum Dikerjakan';
