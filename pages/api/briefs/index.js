@@ -8,11 +8,11 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { tglMasuk, pilar, platform, brief, status, tglSelesai, hasilAkhir, referensi, tglPosting, deskripsiBrief, isReference } = req.body || {};
+      const { tglMasuk, pilar, platform, brief, status, tglSelesai, tglSetor, hasilAkhir, referensi, tglPosting, deskripsiBrief, isReference } = req.body || {};
       if (!tglMasuk || !brief) {
         return res.status(400).json({ error: 'tglMasuk dan brief wajib diisi' });
       }
-      const created = await addBrief({ tglMasuk, pilar, platform, brief, status, tglSelesai, hasilAkhir, referensi, tglPosting, deskripsiBrief, isReference: isReference ? String(isReference) : 'false' });
+      const created = await addBrief({ tglMasuk, pilar, platform, brief, status, tglSelesai, tglSetor, hasilAkhir, referensi, tglPosting, deskripsiBrief, isReference: isReference ? String(isReference) : 'false' });
       return res.status(201).json(created);
     }
 

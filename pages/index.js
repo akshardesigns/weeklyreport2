@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 
 const PILARS = ['Ads', 'Feed', 'Story', 'Carousel', 'Video', 'Lainnya'];
 const PLATFORMS = ['Instagram', 'Tiktok', 'Non sosmed'];
-const STATUS_OPTIONS = ['On Going', 'Waiting Approval', 'Selesai Terupload'];
+const STATUS_OPTIONS = ['On Going', 'Waiting Approval', 'File Terupload'];
 
 const EMPTY_FORM = {
   tglMasuk: '',
@@ -12,6 +12,7 @@ const EMPTY_FORM = {
   brief: '',
   deskripsiBrief: '',
   status: '',
+  tglSetor: '',
   tglSelesai: '',
   hasilAkhir: '',
   referensi: '',
@@ -110,6 +111,7 @@ const CALENDAR_STATUS_STYLE = {
   'Belum Dikerjakan': { bg: '#ffffff', border: 'var(--hair)' },
   'On Going': { bg: '#fff9db', border: '#ffcc00' },
   'Waiting Approval': { bg: 'rgba(255,59,48,0.10)', border: 'var(--red)' },
+  'File Terupload': { bg: 'rgba(52,199,89,0.14)', border: 'var(--green)' },
   'Selesai Terupload': { bg: 'rgba(52,199,89,0.14)', border: 'var(--green)' },
 };
 
@@ -140,7 +142,8 @@ function kpiFor(b) {
   const weekRange = getWeekRangeForDate(b.tglMasuk);
   if (!weekRange) return null;
 
-  if (statusOf(b) === 'Selesai Terupload') {
+  const st = statusOf(b);
+  if (st === 'File Terupload' || st === 'Selesai Terupload') {
     if (!b.tglSelesai) return 'On Time';
     const selesaiDate = parseISODate(b.tglSelesai);
     return selesaiDate <= weekRange.end ? 'On Time' : 'Late';
@@ -156,10 +159,13 @@ function kpiFor(b) {
 }
 function statusOf(b) {
   if (!b) return 'Belum Dikerjakan';
-  return b.status ? b.status : 'Belum Dikerjakan';
+  if (!b.status) return 'Belum Dikerjakan';
+  if (b.status === 'Selesai Terupload') return 'File Terupload';
+  return b.status;
 }
 function pillClass(status) {
   const map = {
+    'File Terupload': 'pill-green',
     'Selesai Terupload': 'pill-green',
     'On Going': 'pill-orange',
     'Waiting Approval': 'pill-red',
@@ -656,7 +662,8 @@ export default function Home() {
   const dailyCompleted = useMemo(() => {
     const map = {};
     filteredBriefs.forEach((b) => {
-      if (statusOf(b) === 'Selesai Terupload' && b.tglSelesai) {
+      const st = statusOf(b);
+      if ((st === 'File Terupload' || st === 'Selesai Terupload') && b.tglSelesai) {
         if (!map[b.tglSelesai]) map[b.tglSelesai] = [];
         map[b.tglSelesai].push(b);
       }
@@ -706,6 +713,7 @@ export default function Home() {
       brief: b.brief,
       deskripsiBrief: b.deskripsiBrief || '',
       status: b.status,
+      tglSetor: b.tglSetor || b.tglSelesai || '',
       tglSelesai: b.tglSelesai || '',
       hasilAkhir: b.hasilAkhir || '',
       referensi: b.referensi || '',
@@ -791,7 +799,8 @@ export default function Home() {
       brief: form.brief,
       deskripsiBrief: form.deskripsiBrief,
       status: form.status,
-      tglSelesai: form.tglSelesai,
+      tglSetor: form.tglSetor || '',
+      tglSelesai: form.tglSelesai || '',
       hasilAkhir: form.hasilAkhir,
       referensi: form.referensi,
       tglPosting: platformDates.join(','),
@@ -819,8 +828,8 @@ export default function Home() {
           throw new Error(data.error || 'Gagal menambah brief');
         }
       }
-      if (form.status === 'Selesai Terupload') {
-        triggerToast(`Brief "${form.brief}" telah Selesai Terupload!`);
+      if (form.status === 'File Terupload' || form.status === 'Selesai Terupload') {
+        triggerToast(`Brief "${form.brief}" telah File Terupload!`);
       }
       closeForm();
       await loadBriefs();
@@ -859,14 +868,16 @@ export default function Home() {
         Platform: platformLabel(b),
         'Judul Brief': b.brief,
         'Deskripsi Brief': b.deskripsiBrief || '',
-        Status: b.status,
-        'Tanggal Selesai': b.tglSelesai,
+        Status: statusOf(b),
+        'Tanggal Setor': b.tglSetor || b.tglSelesai || '',
+        'Tanggal Upload File': b.tglSelesai,
         'Tanggal Posting': platformDatePairs(b)
           .filter((pr) => pr.date)
-          .map((pr) => `${pr.platform || 'Posting'}: ${pr.date}`)
-          .join(' | '),
-        KPI: kpiFor(b) || '',
-        'Sumber/Referensi': b.hasilAkhir || '',
+          .map((pr) => `${pr.platform}: ${pr.date}`)
+          .join(', '),
+        'KPI (Ketepatan Waktu)': kpiFor(b) || '-',
+        'Hasil Final': b.hasilAkhir || '',
+        Referensi: b.referensi || '',
       }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [
@@ -876,9 +887,11 @@ export default function Home() {
       { wch: 30 },
       { wch: 40 },
       { wch: 18 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 10 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 20 },
+      { wch: 30 },
       { wch: 30 },
     ];
     const wb = XLSX.utils.book_new();
@@ -926,7 +939,7 @@ export default function Home() {
   const total = filteredBriefs.length;
   const countStatus = (s) => filteredBriefs.filter((b) => statusOf(b) === s).length;
   const statuses = [
-    { name: 'Selesai Terupload', color: 'var(--green)' },
+    { name: 'File Terupload', color: 'var(--green)' },
     { name: 'On Going', color: 'var(--orange)' },
     { name: 'Waiting Approval', color: 'var(--red)' },
     { name: 'Belum Dikerjakan', color: 'var(--grey)' },
@@ -948,7 +961,7 @@ export default function Home() {
   const pilarCounts = PILARS.map((name) => ({
     name,
     color: pilarColors[name],
-    n: filteredBriefs.filter((b) => b.pilar === name && statusOf(b) === 'Selesai Terupload').length,
+    n: filteredBriefs.filter((b) => b.pilar === name && (statusOf(b) === 'File Terupload' || statusOf(b) === 'Selesai Terupload')).length,
   }));
   const totalPilar = Math.max(1, pilarCounts.reduce((a, c) => a + c.n, 0));
   let acc = 0;
@@ -1791,7 +1804,8 @@ export default function Home() {
                     <th>Platform</th>
                     <th>Judul Brief</th>
                     <th>Status</th>
-                    <th>Tanggal Selesai</th>
+                    <th>Tanggal Setor</th>
+                    <th>Tanggal Upload File</th>
                     <th>KPI</th>
                     <th>Hasil Final</th>
                     <th>Referensi</th>
@@ -1808,6 +1822,7 @@ export default function Home() {
                         <td>{platformLabel(b)}</td>
                         <td>{b.brief}</td>
                         <td><span className={`pill ${pillClass(statusOf(b))}`}>{statusOf(b)}</span></td>
+                        <td>{fmtDate(b.tglSetor || b.tglSelesai)}</td>
                         <td>{fmtDate(b.tglSelesai)}</td>
                         <td>
                           {k === 'On Time' && <span className="kpi-ok">✓ On Time</span>}
@@ -1934,7 +1949,23 @@ export default function Home() {
                 </div>
                 <div className="field">
                   <label htmlFor="status">Status</label>
-                  <select id="status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  <select
+                    id="status"
+                    value={form.status}
+                    onChange={(e) => {
+                      const newStatus = e.target.value;
+                      setForm((f) => {
+                        const next = { ...f, status: newStatus };
+                        if (newStatus === 'Waiting Approval' && !next.tglSetor) {
+                          next.tglSetor = today;
+                        }
+                        if ((newStatus === 'File Terupload' || newStatus === 'Selesai Terupload') && !next.tglSelesai) {
+                          next.tglSelesai = today;
+                        }
+                        return next;
+                      });
+                    }}
+                  >
                     <option value="">Belum Dikerjakan</option>
                     {STATUS_OPTIONS.map((s) => (
                       <option key={s} value={s}>{s}</option>
@@ -1942,7 +1973,16 @@ export default function Home() {
                   </select>
                 </div>
                 <div className="field">
-                  <label htmlFor="tglSelesai">Tanggal Selesai</label>
+                  <label htmlFor="tglSetor">Tanggal Setor</label>
+                  <input
+                    type="date"
+                    id="tglSetor"
+                    value={form.tglSetor}
+                    onChange={(e) => setForm({ ...form, tglSetor: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="tglSelesai">Tanggal Upload File</label>
                   <input
                     type="date"
                     id="tglSelesai"
@@ -2265,6 +2305,26 @@ export default function Home() {
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>
                     {selectedCalendarBrief.brief.tglMasuk || '-'}
+                  </div>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
+                    Tanggal Setor
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>
+                    {selectedCalendarBrief.brief.tglSetor || selectedCalendarBrief.brief.tglSelesai || '-'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 24 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.03em', marginBottom: 4 }}>
+                    Tanggal Upload File
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>
+                    {selectedCalendarBrief.brief.tglSelesai || '-'}
                   </div>
                 </div>
 
