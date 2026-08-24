@@ -620,14 +620,34 @@ export default function Home() {
     loadBriefs();
   }, []);
 
-  const [selectedDashboardMonth, setSelectedDashboardMonth] = useState('2026-6');
-  const [weekInMonthIndex, setWeekInMonthIndex] = useState(0);
+  const [selectedDashboardMonth, setSelectedDashboardMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${d.getMonth()}`;
+  });
 
   const currentMonthWeeks = useMemo(() => {
     if (!selectedDashboardMonth || selectedDashboardMonth === 'all') return [];
     const parts = selectedDashboardMonth.split('-').map(Number);
     return getWeeksForMonth(parts[0], parts[1]);
   }, [selectedDashboardMonth]);
+
+  const [weekInMonthIndex, setWeekInMonthIndex] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    const weeks = getWeeksForMonth(d.getFullYear(), d.getMonth());
+    const idx = weeks.findIndex((w) => d >= w.start && d <= w.end);
+    return idx !== -1 ? idx : 0;
+  });
+
+  function resetToCurrentWeek() {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    const currMonthVal = `${d.getFullYear()}-${d.getMonth()}`;
+    setSelectedDashboardMonth(currMonthVal);
+    const weeks = getWeeksForMonth(d.getFullYear(), d.getMonth());
+    const idx = weeks.findIndex((w) => d >= w.start && d <= w.end);
+    setWeekInMonthIndex(idx !== -1 ? idx : 0);
+  }
 
   const activeWeekRange = useMemo(() => {
     if (weekInMonthIndex === null || weekInMonthIndex >= currentMonthWeeks.length) return null;
@@ -1614,6 +1634,16 @@ export default function Home() {
                   ))}
                 </select>
               </div>
+
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={resetToCurrentWeek}
+                title="Kembali ke Minggu Produksi Saat Ini"
+                style={{ fontWeight: 600 }}
+              >
+                📍 Minggu Saat Ini
+              </button>
             </div>
           </div>
 
