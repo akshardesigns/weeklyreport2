@@ -1102,42 +1102,9 @@ export default function Home() {
     }
   }
 
-  function triggerAutoDownloadAndPlatformRedirect(brief, targetPlatform) {
-    if (!brief) return;
-    const mediaUrl = brief.hasilAkhir;
-    if (mediaUrl) {
-      let downloadUrl = mediaUrl;
-      if (mediaUrl.includes('drive.google.com')) {
-        const match = mediaUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || mediaUrl.match(/id=([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-          downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-        }
-      }
-
-      const isFolder = mediaUrl.includes('/folders/');
-      if (isFolder) {
-        window.open(mediaUrl, '_blank');
-      } else {
-        const cleanName = brief.brief ? brief.brief.replace(/[^a-z0-9]/gi, '_') : 'media_asset';
-        const proxyUrl = `/api/download?url=${encodeURIComponent(downloadUrl)}&filename=${encodeURIComponent(cleanName)}`;
-        
-        // Force direct browser download using hidden iframe trick
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = proxyUrl;
-        document.body.appendChild(iframe);
-        setTimeout(() => {
-          if (document.body.contains(iframe)) document.body.removeChild(iframe);
-        }, 15000);
-      }
-    }
-
-    // Open target platform in new tab after 600ms so download initiates first
-    setTimeout(() => {
-      const plat = (targetPlatform || platformsOf(brief)[0] || '').toLowerCase();
-      const dest = plat.includes('tiktok') || plat.includes('tok') ? 'https://www.tiktok.com' : 'https://www.instagram.com';
-      window.open(dest, '_blank');
-    }, 600);
+  function openHasilFinal(mediaUrl) {
+    if (!mediaUrl) return;
+    window.open(mediaUrl, '_blank');
   }
 
   async function updateBriefPostingDate(brief, targetPlatform, targetDate) {
@@ -2444,22 +2411,15 @@ export default function Home() {
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {selectedCalendarBrief.brief && (
+                {selectedCalendarBrief.brief && selectedCalendarBrief.brief.hasilAkhir && (
                   <button
                     type="button"
                     className="btn btn-primary"
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13.5, fontWeight: 600 }}
-                    onClick={() => {
-                      triggerAutoDownloadAndPlatformRedirect(
-                        selectedCalendarBrief.brief,
-                        selectedCalendarBrief.platform
-                      );
-                    }}
-                    title="Akses media & buka aplikasi platform"
+                    onClick={() => openHasilFinal(selectedCalendarBrief.brief.hasilAkhir)}
+                    title="Buka link Hasil Final"
                   >
-                    {selectedCalendarBrief.brief.hasilAkhir && selectedCalendarBrief.brief.hasilAkhir.includes('/folders/')
-                      ? '📂 Buka Folder Drive & App'
-                      : '📥 Download File & App'}
+                    🔗 Buka Link Hasil Final ↗
                   </button>
                 )}
 
@@ -2578,9 +2538,10 @@ export default function Home() {
                           <button
                             type="button"
                             className="btn btn-outline btn-sm"
-                            onClick={() => triggerAutoDownloadAndPlatformRedirect(b, platformsOf(b)[0])}
+                            onClick={() => openHasilFinal(b.hasilAkhir)}
+                            title="Buka link Hasil Final"
                           >
-                            {b.hasilAkhir.includes('/folders/') ? '📂 Drive' : '📥 Media'}
+                            🔗 Buka Link ↗
                           </button>
                         )}
                         <button
