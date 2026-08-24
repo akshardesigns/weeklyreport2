@@ -197,8 +197,9 @@ function parseISODate(s) {
 }
 
 function getWeeksForMonth(year, monthIndex) {
-  // Siklus mingguan: Senin - Minggu (Maksimal 4 Minggu per bulan)
+  // Siklus mingguan: Senin - Minggu
   // Contoh W1 Agustus 2026: 27 Juli - 02 Agustus 2026
+  // W5 Agustus 2026: 24 Agustus - 30 Agustus 2026
   const firstOfMonth = new Date(year, monthIndex, 1);
   let d = new Date(firstOfMonth);
   let dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
@@ -207,11 +208,15 @@ function getWeeksForMonth(year, monthIndex) {
 
   const weeks = [];
   let weekNum = 1;
-  while (weekNum <= 4) {
+  while (true) {
     const wStart = new Date(d);
     const wEnd = addDays(wStart, 6);
-    weeks.push({ weekNum, start: wStart, end: wEnd });
-    weekNum++;
+    if (wStart.getMonth() === monthIndex || wEnd.getMonth() === monthIndex) {
+      weeks.push({ weekNum, start: wStart, end: wEnd });
+      weekNum++;
+    } else if (wStart.getMonth() > monthIndex || wStart.getFullYear() > year) {
+      break;
+    }
     d = addDays(d, 7);
   }
   return weeks;
@@ -1823,7 +1828,7 @@ export default function Home() {
                         <td>
                           {k === 'On Time' && <span className="kpi-ok">✓ On Time</span>}
                           {k === 'Late' && <span className="kpi-late">✕ Late</span>}
-                          {k === null && <span className="kpi-none">Belum</span>}
+                          {k === null && <span className="kpi-none">-</span>}
                         </td>
                         <td>
                           {b.hasilAkhir ? (
