@@ -197,9 +197,11 @@ function parseISODate(s) {
 }
 
 function getWeeksForMonth(year, monthIndex) {
-  // Siklus mingguan: Senin - Minggu
-  // Contoh W1 Agustus 2026: 27 Juli - 02 Agustus 2026
-  // W5 Agustus 2026: 24 Agustus - 30 Agustus 2026
+  // Setiap minggu (Senin - Minggu) dimiliki oleh bulan tempat hari MINGGU (wEnd) tersebut berada.
+  // Contoh:
+  // W1 Agustus 2026: 27 Jul - 02 Agu (wEnd 02 Agu di bulan Agustus)
+  // W5 Agustus 2026: 24 Agu - 30 Agu (wEnd 30 Agu di bulan Agustus)
+  // W1 September 2026: 31 Agu - 06 Sep (wEnd 06 Sep di bulan September)
   const firstOfMonth = new Date(year, monthIndex, 1);
   let d = new Date(firstOfMonth);
   let dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
@@ -211,10 +213,12 @@ function getWeeksForMonth(year, monthIndex) {
   while (true) {
     const wStart = new Date(d);
     const wEnd = addDays(wStart, 6);
-    if (wStart.getMonth() === monthIndex || wEnd.getMonth() === monthIndex) {
+
+    // Minggu ini termasuk bulan ini jika hari MINGGU-nya (wEnd) berada di bulan & tahun ini
+    if (wEnd.getFullYear() === year && wEnd.getMonth() === monthIndex) {
       weeks.push({ weekNum, start: wStart, end: wEnd });
       weekNum++;
-    } else if (wStart.getMonth() > monthIndex || wStart.getFullYear() > year) {
+    } else if (wEnd.getFullYear() > year || (wEnd.getFullYear() === year && wEnd.getMonth() > monthIndex)) {
       break;
     }
     d = addDays(d, 7);
