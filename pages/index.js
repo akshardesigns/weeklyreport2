@@ -197,15 +197,11 @@ function parseISODate(s) {
 }
 
 function getWeeksForMonth(year, monthIndex) {
-  // Masukkan semua minggu (Senin - Minggu) yang memiliki hari di bulan ini
-  // (baik hari Senin/wStart maupun hari Minggu/wEnd ada di bulan ini).
-  // Contoh Agustus 2026:
-  // W1: 27 Jul - 02 Agu
-  // W2: 03 Agu - 09 Agu
-  // W3: 10 Agu - 16 Agu
-  // W4: 17 Agu - 23 Agu
-  // W5: 24 Agu - 30 Agu
-  // W6: 31 Agu - 06 Sep (Memuat tanggal 31 Agustus)
+  // Setiap minggu (Senin - Minggu) dimiliki oleh bulan tempat hari MINGGU (wEnd) tersebut berada.
+  // Contoh:
+  // W1 Agustus 2026: 27 Jul - 02 Agu (wEnd 02 Agu ada di bulan Agustus)
+  // W5 Agustus 2026: 24 Agu - 30 Agu (wEnd 30 Agu ada di bulan Agustus)
+  // W1 September 2026: 31 Agu - 06 Sep (wEnd 06 Sep ada di bulan September, TIDAK ganda di Agustus)
   const firstOfMonth = new Date(year, monthIndex, 1);
   let d = new Date(firstOfMonth);
   let dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
@@ -218,14 +214,11 @@ function getWeeksForMonth(year, monthIndex) {
     const wStart = new Date(d);
     const wEnd = addDays(wStart, 6);
 
-    // Minggu ini termasuk jika tanggal awal (Senin) ATAU tanggal akhir (Minggu) masuk dalam bulan & tahun ini
-    if (
-      (wStart.getFullYear() === year && wStart.getMonth() === monthIndex) ||
-      (wEnd.getFullYear() === year && wEnd.getMonth() === monthIndex)
-    ) {
+    // Minggu ini termasuk bulan ini jika hari MINGGU-nya (wEnd) berada di bulan & tahun ini
+    if (wEnd.getFullYear() === year && wEnd.getMonth() === monthIndex) {
       weeks.push({ weekNum, start: wStart, end: wEnd });
       weekNum++;
-    } else if (wStart.getFullYear() > year || (wStart.getFullYear() === year && wStart.getMonth() > monthIndex)) {
+    } else if (wEnd.getFullYear() > year || (wEnd.getFullYear() === year && wEnd.getMonth() > monthIndex)) {
       break;
     }
     d = addDays(d, 7);
@@ -673,13 +666,14 @@ export default function Home() {
     }
 
     if (!activeWeekRange) {
-      if (!currentMonthWeeks || currentMonthWeeks.length === 0) return list;
-      const monthStart = currentMonthWeeks[0].start;
-      const monthEnd = currentMonthWeeks[currentMonthWeeks.length - 1].end;
+      if (!selectedDashboardMonth) return list;
+      const parts = selectedDashboardMonth.split('-').map(Number);
+      const targetYear = parts[0];
+      const targetMonth = parts[1];
       return list.filter((b) => {
         if (!b.tglMasuk) return false;
         const d = parseISODate(b.tglMasuk);
-        return d >= monthStart && d <= monthEnd;
+        return d.getFullYear() === targetYear && d.getMonth() === targetMonth;
       });
     }
 
