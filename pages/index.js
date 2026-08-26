@@ -197,11 +197,15 @@ function parseISODate(s) {
 }
 
 function getWeeksForMonth(year, monthIndex) {
-  // Setiap minggu (Senin - Minggu) dimiliki oleh bulan tempat hari MINGGU (wEnd) tersebut berada.
-  // Contoh:
-  // W1 Agustus 2026: 27 Jul - 02 Agu (wEnd 02 Agu di bulan Agustus)
-  // W5 Agustus 2026: 24 Agu - 30 Agu (wEnd 30 Agu di bulan Agustus)
-  // W1 September 2026: 31 Agu - 06 Sep (wEnd 06 Sep di bulan September)
+  // Masukkan semua minggu (Senin - Minggu) yang memiliki hari di bulan ini
+  // (baik hari Senin/wStart maupun hari Minggu/wEnd ada di bulan ini).
+  // Contoh Agustus 2026:
+  // W1: 27 Jul - 02 Agu
+  // W2: 03 Agu - 09 Agu
+  // W3: 10 Agu - 16 Agu
+  // W4: 17 Agu - 23 Agu
+  // W5: 24 Agu - 30 Agu
+  // W6: 31 Agu - 06 Sep (Memuat tanggal 31 Agustus)
   const firstOfMonth = new Date(year, monthIndex, 1);
   let d = new Date(firstOfMonth);
   let dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
@@ -214,11 +218,14 @@ function getWeeksForMonth(year, monthIndex) {
     const wStart = new Date(d);
     const wEnd = addDays(wStart, 6);
 
-    // Minggu ini termasuk bulan ini jika hari MINGGU-nya (wEnd) berada di bulan & tahun ini
-    if (wEnd.getFullYear() === year && wEnd.getMonth() === monthIndex) {
+    // Minggu ini termasuk jika tanggal awal (Senin) ATAU tanggal akhir (Minggu) masuk dalam bulan & tahun ini
+    if (
+      (wStart.getFullYear() === year && wStart.getMonth() === monthIndex) ||
+      (wEnd.getFullYear() === year && wEnd.getMonth() === monthIndex)
+    ) {
       weeks.push({ weekNum, start: wStart, end: wEnd });
       weekNum++;
-    } else if (wEnd.getFullYear() > year || (wEnd.getFullYear() === year && wEnd.getMonth() > monthIndex)) {
+    } else if (wStart.getFullYear() > year || (wStart.getFullYear() === year && wStart.getMonth() > monthIndex)) {
       break;
     }
     d = addDays(d, 7);
@@ -1811,7 +1818,7 @@ export default function Home() {
                     <th>KPI</th>
                     <th>Hasil Final</th>
                     <th>Referensi</th>
-                    <th></th>
+                    <th style={{ textAlign: 'center' }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1850,9 +1857,23 @@ export default function Home() {
                           )}
                         </td>
                         <td>
-                          <div className="row-actions">
-                            <button className="icon-btn edit" title="Edit" onClick={() => enterEditMode(b.id)}>✎</button>
-                            <button className="icon-btn del" title="Hapus" onClick={() => handleDelete(b.id)}>✕</button>
+                          <div className="row-actions" style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                            <button
+                              className="btn btn-outline btn-sm"
+                              style={{ padding: '4px 10px', fontSize: 12, fontWeight: 600 }}
+                              title="Edit Brief"
+                              onClick={() => enterEditMode(b.id)}
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              className="btn btn-outline btn-sm"
+                              style={{ padding: '4px 10px', fontSize: 12, color: 'var(--red)', borderColor: 'rgba(255,59,48,0.3)' }}
+                              title="Hapus Brief"
+                              onClick={() => handleDelete(b.id)}
+                            >
+                              🗑️
+                            </button>
                           </div>
                         </td>
                       </tr>
