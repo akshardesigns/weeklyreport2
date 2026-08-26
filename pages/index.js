@@ -1805,20 +1805,20 @@ export default function Home() {
             </div>
 
             <div style={{ overflowX: 'auto' }}>
-              <table>
+              <table style={{ width: '100%', tableLayout: 'auto' }}>
                 <thead>
                   <tr>
-                    <th>Tanggal Masuk</th>
-                    <th>Pilar</th>
-                    <th>Platform</th>
+                    <th style={{ width: '90px' }}>Tgl Masuk</th>
+                    <th style={{ width: '75px' }}>Pilar</th>
+                    <th style={{ width: '85px' }}>Platform</th>
                     <th>Judul Brief</th>
-                    <th>Status</th>
-                    <th>Tanggal Setor</th>
-                    <th>Tanggal Upload File</th>
-                    <th>KPI</th>
-                    <th>Hasil Final</th>
-                    <th>Referensi</th>
-                    <th style={{ textAlign: 'center' }}>Aksi</th>
+                    <th style={{ width: '120px' }}>Status</th>
+                    <th style={{ width: '90px' }}>Tgl Setor</th>
+                    <th style={{ width: '90px' }}>Tgl Upload</th>
+                    <th style={{ width: '75px' }}>KPI</th>
+                    <th style={{ width: '60px' }}>Hasil</th>
+                    <th style={{ width: '55px' }}>Ref</th>
+                    <th style={{ width: '70px', textAlign: 'center' }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1826,14 +1826,14 @@ export default function Home() {
                     const k = kpiFor(b);
                     return (
                       <tr key={b.id} className={b.id === editingId ? 'is-editing' : ''}>
-                        <td>{fmtDate(b.tglMasuk)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(b.tglMasuk)}</td>
                         <td>{b.pilar}</td>
                         <td>{platformLabel(b)}</td>
-                        <td>{b.brief}</td>
+                        <td style={{ maxWidth: 220, wordBreak: 'break-word', fontWeight: 600 }}>{b.brief}</td>
                         <td><span className={`pill ${pillClass(statusOf(b))}`}>{statusOf(b)}</span></td>
-                        <td>{fmtDate(b.tglSetor || b.tglSelesai)}</td>
-                        <td>{fmtDate(b.tglSelesai)}</td>
-                        <td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(b.tglSetor || b.tglSelesai)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(b.tglSelesai)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
                           {k === 'On Time' && <span className="kpi-ok">✓ On Time</span>}
                           {k === 'Late' && <span className="kpi-late">✕ Late</span>}
                           {k === null && <span className="kpi-none">-</span>}
@@ -1856,24 +1856,10 @@ export default function Home() {
                             <span className="kpi-none">-</span>
                           )}
                         </td>
-                        <td>
-                          <div className="row-actions" style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                            <button
-                              className="btn btn-outline btn-sm"
-                              style={{ padding: '4px 10px', fontSize: 12, fontWeight: 600 }}
-                              title="Edit Brief"
-                              onClick={() => enterEditMode(b.id)}
-                            >
-                              ✏️ Edit
-                            </button>
-                            <button
-                              className="btn btn-outline btn-sm"
-                              style={{ padding: '4px 10px', fontSize: 12, color: 'var(--red)', borderColor: 'rgba(255,59,48,0.3)' }}
-                              title="Hapus Brief"
-                              onClick={() => handleDelete(b.id)}
-                            >
-                              🗑️
-                            </button>
+                        <td style={{ textAlign: 'center' }}>
+                          <div className="row-actions" style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+                            <button className="icon-btn edit" title="Edit Brief" onClick={() => enterEditMode(b.id)}>✏️</button>
+                            <button className="icon-btn del" title="Hapus Brief" onClick={() => handleDelete(b.id)}>🗑️</button>
                           </div>
                         </td>
                       </tr>
