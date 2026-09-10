@@ -166,6 +166,9 @@ function pillClass(status) {
     'On Going': 'pill-orange',
     'Waiting Approval': 'pill-red',
     'Belum Dikerjakan': 'pill-grey',
+    'On Time': 'pill-green',
+    'Late': 'pill-red',
+    'Belum Selesai': 'pill-grey',
   };
   return map[status] || 'pill-grey';
 }
@@ -591,6 +594,7 @@ export default function Home() {
   const [filterPilar, setFilterPilar] = useState('');
   const [filterPlatform, setFilterPlatform] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterKpi, setFilterKpi] = useState('');
 
   // tanggal yang sedang di-expand di panel "Brief Selesai per Hari"
   const [expandedDate, setExpandedDate] = useState(null);
@@ -700,7 +704,7 @@ export default function Home() {
   }, [filteredBriefs]);
   const maxDaily = Math.max(1, ...dailyCompleted.map((d) => d.items.length));
 
-  // daftar brief di tabel: filteredBriefs + filter tambahan (pilar/platform/status)
+  // daftar brief di tabel: filteredBriefs + filter tambahan (pilar/platform/status/KPI)
   const tableBriefs = useMemo(() => {
     return filteredBriefs.filter((b) => {
       if (filterPilar && b.pilar !== filterPilar) return false;
@@ -712,10 +716,16 @@ export default function Home() {
           return false;
         }
       }
+      if (filterKpi) {
+        const k = kpiFor(b);
+        if (filterKpi === 'On Time' && k !== 'On Time') return false;
+        if (filterKpi === 'Late' && k !== 'Late') return false;
+        if (filterKpi === 'Belum Selesai' && k !== null) return false;
+      }
       return true;
     });
-  }, [filteredBriefs, filterPilar, filterPlatform, filterStatus]);
-  const hasTableFilter = filterPilar || filterPlatform || filterStatus;
+  }, [filteredBriefs, filterPilar, filterPlatform, filterStatus, filterKpi]);
+  const hasTableFilter = filterPilar || filterPlatform || filterStatus || filterKpi;
 
   function openAddForm(prefill) {
     setEditingId(null);
@@ -932,6 +942,15 @@ export default function Home() {
     if (!statusModal) return [];
     if (statusModal === 'Total Brief') return filteredBriefs;
     const target = statusModal.trim().toLowerCase();
+    if (target === 'on time') {
+      return filteredBriefs.filter((b) => kpiFor(b) === 'On Time');
+    }
+    if (target === 'late') {
+      return filteredBriefs.filter((b) => kpiFor(b) === 'Late');
+    }
+    if (target === 'belum selesai') {
+      return filteredBriefs.filter((b) => kpiFor(b) === null);
+    }
     return filteredBriefs.filter((b) => {
       const s = (statusOf(b) || '').trim().toLowerCase();
       if (target === 'belum dikerjakan') {
@@ -1684,13 +1703,24 @@ export default function Home() {
               </div>
             </div>
             <div className="panel">
-              <h3>Ketepatan Waktu</h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h3 style={{ margin: 0 }}>Ketepatan Waktu</h3>
+                <span style={{ fontSize: 11, color: 'var(--blue)', fontWeight: 500 }}>🔍 Klik rincian</span>
+              </div>
               <div>
                 {Object.entries(kpiVals).map(([k, v]) => {
                   const pct = ((v / maxKpi) * 100).toFixed(0);
+                  const isSelected = filterKpi === k;
                   return (
-                    <div className="bar-row" key={k}>
-                      <div className="name">{k}</div>
+                    <div
+                      className="bar-row clickable"
+                      key={k}
+                      onClick={(e) => handleCardClickOrDoubleClick(e, k)}
+                      onDoubleClick={(e) => handleCardClickOrDoubleClick(e, k)}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      title={`Klik / Double klik untuk membuka rincian brief ${k}`}
+                    >
+                      <div className="name" style={{ fontWeight: isSelected ? 700 : 500 }}>{k}</div>
                       <div className="bar-track">
                         <div className="bar-fill" style={{ width: pct + '%', background: kpiColors[k] }} />
                       </div>
@@ -1749,14 +1779,19 @@ export default function Home() {
           <div className="list-panel" id="table-panel">
             <div className="list-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3>Daftar Brief</h3>
-              {filterStatus && (
+              {hasTableFilter && (
                 <span style={{ fontSize: 12.5, background: 'rgba(0,113,227,0.1)', color: 'var(--blue)', padding: '4px 12px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
-                  Menampilkan: <b>{filterStatus}</b> ({sortedBriefs.length} brief)
+                  Filter: <b>{[filterPilar, filterPlatform, filterStatus, filterKpi ? `KPI: ${filterKpi}` : ''].filter(Boolean).join(' • ')}</b> ({sortedBriefs.length} brief)
                   <button
                     type="button"
-                    onClick={() => setFilterStatus('')}
+                    onClick={() => {
+                      setFilterPilar('');
+                      setFilterPlatform('');
+                      setFilterStatus('');
+                      setFilterKpi('');
+                    }}
                     style={{ border: 'none', background: 'none', color: 'var(--blue)', cursor: 'pointer', fontWeight: 700, marginLeft: 4 }}
-                    title="Tampilkan Semua Brief"
+                    title="Clear Filter"
                   >
                     ✕ Clear
                   </button>
@@ -1784,6 +1819,12 @@ export default function Home() {
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
+              <select value={filterKpi} onChange={(e) => setFilterKpi(e.target.value)}>
+                <option value="">Semua Ketepatan Waktu (KPI)</option>
+                <option value="On Time">On Time</option>
+                <option value="Late">Late</option>
+                <option value="Belum Selesai">Belum Selesai</option>
+              </select>
               {hasTableFilter && (
                 <button
                   className="btn btn-ghost btn-sm"
@@ -1791,6 +1832,7 @@ export default function Home() {
                     setFilterPilar('');
                     setFilterPlatform('');
                     setFilterStatus('');
+                    setFilterKpi('');
                   }}
                 >
                   Reset Filter
@@ -2455,7 +2497,9 @@ export default function Home() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, borderBottom: '1px solid var(--hair)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>
-                  Daftar Brief Status: {statusModal}
+                  {['On Time', 'Late', 'Belum Selesai'].includes(statusModal)
+                    ? `Rincian Ketepatan Waktu: ${statusModal}`
+                    : `Daftar Brief Status: ${statusModal}`}
                 </h3>
                 <span className={`pill ${pillClass(statusModal)}`} style={{ fontSize: 12 }}>
                   {briefsForModal.length} Brief
@@ -2503,71 +2547,82 @@ export default function Home() {
 
             <div style={{ overflowY: 'auto', flex: 1, paddingTop: 16, paddingBottom: 16 }}>
               {briefsForModal.length === 0 ? (
-                <div className="empty">Tidak ada brief dengan status "{statusModal}".</div>
+                <div className="empty">Tidak ada brief dengan rincian "{statusModal}".</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {briefsForModal.map((b) => (
-                    <div
-                      key={b.id}
-                      style={{
-                        background: 'var(--bg)',
-                        border: '1px solid var(--hair)',
-                        borderRadius: 12,
-                        padding: '14px 18px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 16,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <div style={{ flex: '1 1 280px' }}>
-                        <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--ink)', marginBottom: 4 }}>
-                          {b.brief}
+                  {briefsForModal.map((b) => {
+                    const kb = kpiFor(b);
+                    return (
+                      <div
+                        key={b.id}
+                        style={{
+                          background: 'var(--bg)',
+                          border: '1px solid var(--hair)',
+                          borderRadius: 12,
+                          padding: '14px 18px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 16,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div style={{ flex: '1 1 300px' }}>
+                          <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--ink)', marginBottom: 4 }}>
+                            {b.brief}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+                            <span className="tag">{b.pilar}</span>
+                            <span className="tag">{platformLabel(b)}</span>
+                            <span className={`pill ${pillClass(statusOf(b))}`} style={{ fontSize: 11.5, padding: '2px 8px' }}>
+                              {statusOf(b)}
+                            </span>
+                            {kb === 'On Time' && <span className="kpi-ok" style={{ fontSize: 11.5 }}>✓ On Time</span>}
+                            {kb === 'Late' && <span className="kpi-late" style={{ fontSize: 11.5 }}>✕ Late</span>}
+                            {kb === null && <span className="kpi-none" style={{ fontSize: 11.5 }}>⏳ Belum Selesai</span>}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--sub)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                            <span>🗓️ Masuk: {fmtDate(b.tglMasuk)}</span>
+                            <span>📤 Upload File: {fmtDate(b.tglSelesai)}</span>
+                            <span>📱 Posting: {b.tglPosting || '-'}</span>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span className="tag">{b.pilar}</span>
-                          <span className="tag">{platformLabel(b)}</span>
-                          <span style={{ fontSize: 12, color: 'var(--sub)', marginLeft: 4 }}>
-                            🗓️ Posting: {b.tglPosting || 'Belum dijadwalkan'}
-                          </span>
-                        </div>
-                      </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {b.hasilAkhir && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {b.hasilAkhir && (
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              onClick={() => openHasilFinal(b.hasilAkhir)}
+                              title="Buka link Hasil Final"
+                            >
+                              🔗 Buka Link ↗
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="btn btn-outline btn-sm"
-                            onClick={() => openHasilFinal(b.hasilAkhir)}
-                            title="Buka link Hasil Final"
+                            onClick={() => {
+                              setStatusModal(null);
+                              enterEditMode(b.id);
+                            }}
                           >
-                            🔗 Buka Link ↗
+                            ✏️ Edit
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          onClick={() => {
-                            setStatusModal(null);
-                            enterEditMode(b.id);
-                          }}
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          style={{ color: 'var(--red)', borderColor: 'rgba(255,59,48,0.3)' }}
-                          onClick={() => {
-                            handleDelete(b.id);
-                          }}
-                        >
-                          🗑️
-                        </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            style={{ color: 'var(--red)', borderColor: 'rgba(255,59,48,0.3)' }}
+                            onClick={() => {
+                              handleDelete(b.id);
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
