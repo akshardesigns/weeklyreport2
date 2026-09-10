@@ -2582,9 +2582,9 @@ export default function Home() {
                             {kb === null && <span className="kpi-none" style={{ fontSize: 11.5 }}>⏳ Belum Selesai</span>}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--sub)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                            <span>🗓️ Masuk: {fmtDate(b.tglMasuk)}</span>
-                            <span>📤 Upload File: {fmtDate(b.tglSelesai)}</span>
-                            <span>📱 Posting: {b.tglPosting || '-'}</span>
+                            <span>🗓️ Tanggal Masuk: {fmtDate(b.tglMasuk)}</span>
+                            <span>📦 Tanggal Setor: {fmtDate(b.tglSetor || b.tglSelesai)}</span>
+                            <span>📤 Tanggal File Terupload: {fmtDate(b.tglSelesai)}</span>
                           </div>
                         </div>
 
