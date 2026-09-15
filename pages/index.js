@@ -764,6 +764,9 @@ export default function Home() {
       if (!datesMap[p]) datesMap[p] = baseDate;
     });
     initialForm.tglPostingByPlatform = datesMap;
+    if (view === 'kalender') {
+      initialForm.isReference = true;
+    }
     setForm(initialForm);
     setFormMsg('');
     setUploadedFileName('');
