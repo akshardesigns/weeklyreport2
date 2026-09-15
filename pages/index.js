@@ -29,7 +29,12 @@ function isReferenceBrief(b) {
   if (!b) return false;
   const v = b.isReference;
   if (v === true) return true;
-  return String(v || '').trim().toLowerCase() === 'true';
+  const str = String(v || '').trim().toLowerCase();
+  if (str === 'true' || str === '1' || str === 'yes' || str === 'y') return true;
+  // Fallback: periksa jika kolom referensi berisi 'true' akibat mismatch urutan kolom terdahulu
+  const refStr = String(b.referensi || '').trim().toLowerCase();
+  if (refStr === 'true') return true;
+  return false;
 }
 
 const PLATFORM_COLORS = {
