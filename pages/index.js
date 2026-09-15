@@ -88,22 +88,39 @@ function platformLabel(b) {
   return list.length ? list.join(' + ') : '-';
 }
 
+function normalizeISODateStr(s) {
+  if (!s) return '';
+  const str = String(s).trim();
+  const m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) {
+    const y = m[1];
+    const mon = String(m[2]).padStart(2, '0');
+    const d = String(m[3]).padStart(2, '0');
+    return `${y}-${mon}-${d}`;
+  }
+  return str;
+}
+
 // Pasangkan tiap platform dengan tanggal postingnya masing-masing.
 // tglPosting disimpan sejajar urutan dengan platform (dipisah koma), mis.
 // platform="Instagram,Tiktok" & tglPosting="2026-08-01,2026-08-03".
-// Data lama yang cuma punya 1 tanggal untuk banyak platform tetap dianggap
-// tanggal yang sama untuk semua platform (backward-compatible).
+// Jika tglPosting belum terisi, fallback otomatis ke tglMasuk.
 function platformDatePairs(b) {
   if (!b) return [];
   const plats = platformsOf(b);
-  const dates = (b.tglPosting || '').split(',').map((s) => s.trim());
+  const rawPosting = (b.tglPosting || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const dates = rawPosting.length > 0 ? rawPosting : [b.tglMasuk || ''];
+
   if (plats.length === 0) {
-    return [{ platform: '', date: dates[0] || '' }];
+    return [{ platform: '', date: normalizeISODateStr(dates[0] || '') }];
   }
   if (dates.length <= 1 && plats.length > 1) {
-    return plats.map((p) => ({ platform: p, date: dates[0] || '' }));
+    return plats.map((p) => ({ platform: p, date: normalizeISODateStr(dates[0] || '') }));
   }
-  return plats.map((p, i) => ({ platform: p, date: dates[i] || '' }));
+  return plats.map((p, i) => ({ platform: p, date: normalizeISODateStr(dates[i] || dates[0] || '') }));
 }
 
 // Warna kartu di Kalender Konten mengikuti status brief.
@@ -841,7 +858,10 @@ export default function Home() {
     }
     setFormMsg('');
     setSaving(true);
-    const platformDates = form.platform.map((p) => (form.tglPostingByPlatform[p] || '').trim());
+    const platformDates = form.platform.map((p) => {
+      const customDate = (form.tglPostingByPlatform[p] || '').trim();
+      return customDate || form.tglMasuk;
+    });
     const payload = {
       tglMasuk: form.tglMasuk,
       pilar: form.pilar,
@@ -880,6 +900,12 @@ export default function Home() {
       }
       if (form.status === 'File Terupload' || form.status === 'Selesai Terupload') {
         triggerToast(`Brief "${form.brief}" telah File Terupload!`);
+      }
+      if (form.tglMasuk) {
+        const dt = parseISODate(form.tglMasuk);
+        if (!isNaN(dt)) {
+          setCalendarMonth(new Date(dt.getFullYear(), dt.getMonth(), 1));
+        }
       }
       closeForm();
       await loadBriefs();
