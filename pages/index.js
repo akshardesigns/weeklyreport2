@@ -747,19 +747,18 @@ export default function Home() {
   function openAddForm(prefill) {
     setEditingId(null);
     const initialForm = prefill ? { ...EMPTY_FORM, ...prefill } : { ...EMPTY_FORM };
-    if (prefill && prefill._prefillDate) {
-      if (!initialForm.tglMasuk) {
-        initialForm.tglMasuk = prefill._prefillDate;
-      }
-      if (!initialForm.platform || initialForm.platform.length === 0) {
-        initialForm.platform = ['Instagram'];
-      }
-      const datesMap = { ...initialForm.tglPostingByPlatform };
-      initialForm.platform.forEach((p) => {
-        if (!datesMap[p]) datesMap[p] = prefill._prefillDate;
-      });
-      initialForm.tglPostingByPlatform = datesMap;
+    const baseDate = (prefill && prefill._prefillDate) || todayISO();
+    if (!initialForm.tglMasuk) {
+      initialForm.tglMasuk = baseDate;
     }
+    if (!initialForm.platform || initialForm.platform.length === 0) {
+      initialForm.platform = ['Instagram'];
+    }
+    const datesMap = { ...initialForm.tglPostingByPlatform };
+    initialForm.platform.forEach((p) => {
+      if (!datesMap[p]) datesMap[p] = baseDate;
+    });
+    initialForm.tglPostingByPlatform = datesMap;
     setForm(initialForm);
     setFormMsg('');
     setUploadedFileName('');
@@ -900,9 +899,12 @@ export default function Home() {
       }
       if (form.status === 'File Terupload' || form.status === 'Selesai Terupload') {
         triggerToast(`Brief "${form.brief}" telah File Terupload!`);
+      } else {
+        triggerToast(`Brief "${form.brief}" berhasil disimpan di Kalender Konten!`);
       }
-      if (form.tglMasuk) {
-        const dt = parseISODate(form.tglMasuk);
+      const targetPostingDate = platformDates[0] || form.tglMasuk;
+      if (targetPostingDate) {
+        const dt = parseISODate(targetPostingDate);
         if (!isNaN(dt)) {
           setCalendarMonth(new Date(dt.getFullYear(), dt.getMonth(), 1));
         }
