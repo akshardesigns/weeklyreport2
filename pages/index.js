@@ -752,21 +752,26 @@ export default function Home() {
   function openAddForm(prefill) {
     setEditingId(null);
     const initialForm = prefill ? { ...EMPTY_FORM, ...prefill } : { ...EMPTY_FORM };
-    const baseDate = (prefill && prefill._prefillDate) || todayISO();
-    if (!initialForm.tglMasuk) {
-      initialForm.tglMasuk = baseDate;
-    }
+    const todayStr = todayISO();
+    
+    // Tanggal Masuk otomatis tanggal saat ini saat input
+    initialForm.tglMasuk = todayStr;
+
     if (!initialForm.platform || initialForm.platform.length === 0) {
       initialForm.platform = ['Instagram'];
     }
+
+    // Tanggal posting per platform: jika double-click sel kalender gunakan _prefillDate, jika tidak gunakan today
+    const postingBaseDate = (prefill && prefill._prefillDate) || todayStr;
     const datesMap = { ...initialForm.tglPostingByPlatform };
     initialForm.platform.forEach((p) => {
-      if (!datesMap[p]) datesMap[p] = baseDate;
+      if (!datesMap[p]) datesMap[p] = postingBaseDate;
     });
     initialForm.tglPostingByPlatform = datesMap;
-    if (view === 'kalender') {
-      initialForm.isReference = true;
-    }
+
+    // Tidak dicentang otomatis, biarkan pengguna centang manual jika ingin data transisi
+    initialForm.isReference = false;
+
     setForm(initialForm);
     setFormMsg('');
     setUploadedFileName('');
