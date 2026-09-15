@@ -94,8 +94,27 @@ function platformLabel(b) {
 }
 
 function normalizeISODateStr(s) {
-  if (!s) return '';
+  if (s === undefined || s === null || s === '') return '';
   const str = String(s).trim();
+  if (!str) return '';
+
+  if (str.includes(',')) {
+    return str
+      .split(',')
+      .map((part) => normalizeISODateStr(part.trim()))
+      .filter(Boolean)
+      .join(',');
+  }
+
+  const num = Number(str);
+  if (!isNaN(num) && num > 30000 && num < 60000) {
+    const date = new Date(Math.round((num - 25569) * 86400000));
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   const m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if (m) {
     const y = m[1];
@@ -103,6 +122,15 @@ function normalizeISODateStr(s) {
     const d = String(m[3]).padStart(2, '0');
     return `${y}-${mon}-${d}`;
   }
+
+  const m2 = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (m2) {
+    const d = String(m2[1]).padStart(2, '0');
+    const mon = String(m2[2]).padStart(2, '0');
+    const y = m2[3];
+    return `${y}-${mon}-${d}`;
+  }
+
   return str;
 }
 
@@ -117,7 +145,10 @@ function platformDatePairs(b) {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  const dates = rawPosting.length > 0 ? rawPosting : [b.tglMasuk || ''];
+  let dates = rawPosting.map((d) => normalizeISODateStr(d)).filter(Boolean);
+  if (dates.length === 0) {
+    dates = [normalizeISODateStr(b.tglMasuk) || ''];
+  }
 
   if (plats.length === 0) {
     return [{ platform: '', date: normalizeISODateStr(dates[0] || '') }];
