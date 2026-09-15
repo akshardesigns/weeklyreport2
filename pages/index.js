@@ -729,7 +729,21 @@ export default function Home() {
 
   function openAddForm(prefill) {
     setEditingId(null);
-    setForm(prefill ? { ...EMPTY_FORM, ...prefill } : EMPTY_FORM);
+    const initialForm = prefill ? { ...EMPTY_FORM, ...prefill } : { ...EMPTY_FORM };
+    if (prefill && prefill._prefillDate) {
+      if (!initialForm.tglMasuk) {
+        initialForm.tglMasuk = prefill._prefillDate;
+      }
+      if (!initialForm.platform || initialForm.platform.length === 0) {
+        initialForm.platform = ['Instagram'];
+      }
+      const datesMap = { ...initialForm.tglPostingByPlatform };
+      initialForm.platform.forEach((p) => {
+        if (!datesMap[p]) datesMap[p] = prefill._prefillDate;
+      });
+      initialForm.tglPostingByPlatform = datesMap;
+    }
+    setForm(initialForm);
     setFormMsg('');
     setUploadedFileName('');
     setFormOpen(true);
@@ -1063,7 +1077,6 @@ export default function Home() {
   const unscheduledBriefs = useMemo(
     () =>
       briefs
-        .filter((b) => !isReferenceBrief(b))
         .filter((b) => {
           const pilarLower = (b.pilar || '').trim().toLowerCase();
           return pilarLower !== 'ads' && pilarLower !== 'lainnya';
