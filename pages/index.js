@@ -723,14 +723,13 @@ export default function Home() {
     }
 
     if (!activeWeekRange) {
-      if (!selectedDashboardMonth) return list;
-      const parts = selectedDashboardMonth.split('-').map(Number);
-      const targetYear = parts[0];
-      const targetMonth = parts[1];
+      if (!selectedDashboardMonth || !currentMonthWeeks || currentMonthWeeks.length === 0) return list;
+      const firstWeek = currentMonthWeeks[0];
+      const lastWeek = currentMonthWeeks[currentMonthWeeks.length - 1];
       return list.filter((b) => {
         if (!b.tglMasuk) return false;
         const d = parseISODate(b.tglMasuk);
-        return d.getFullYear() === targetYear && d.getMonth() === targetMonth;
+        return d >= firstWeek.start && d <= lastWeek.end;
       });
     }
 
